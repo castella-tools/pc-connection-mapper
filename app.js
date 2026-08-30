@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.18 loaded');
+console.info('PC Connection Mapper app.js v1.19 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -65,6 +65,29 @@ const DEVICE_GROUPS = [
 const DEVICE_TYPES = DEVICE_GROUPS
   .flatMap(group => group.items)
   .map(([type,iconKey,size])=>({type,iconKey,size}));
+
+const DEVICE_CATEGORY_ACCENTS = {
+  'PC・ディスプレイ':'#60a5fa',
+  '入力・操作':'#38bdf8',
+  'USB・拡張':'#a78bfa',
+  'オーディオ':'#34d399',
+  'ネットワーク・ストレージ':'#fb923c',
+  'その他':'#94a3b8'
+};
+
+function deviceCategoryInfo(type){
+  const group=DEVICE_GROUPS.find(g=>g.items.some(item=>item[0]===type));
+  const label=group?.label || 'その他';
+  return {label,color:DEVICE_CATEGORY_ACCENTS[label] || '#94a3b8'};
+}
+
+function deviceAccent(type){
+  return deviceCategoryInfo(type).color;
+}
+
+const GROUP_ACCENTS = [
+  '#64748b','#60a5fa','#a78bfa','#34d399','#fb923c','#f472b6'
+];
 
 const ICON_SVGS = {
   pc:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
@@ -157,6 +180,9 @@ const viewport = document.getElementById('viewport');
 const world = document.getElementById('world');
 const nodesLayer = document.getElementById('nodes');
 const linksLayer = document.getElementById('links');
+const groupsLayer = document.getElementById('groups');
+const guidesLayer = document.getElementById('guides');
+const diagramTitleLayer = document.getElementById('diagramTitleLayer');
 const palette = document.getElementById('palette');
 const properties = document.getElementById('properties');
 const snapToggle = document.getElementById('snapToggle');
@@ -169,6 +195,8 @@ const jsonFileInput = document.getElementById('jsonFileInput');
 const pngBtn = document.getElementById('pngBtn');
 const newBtn = document.getElementById('newBtn');
 const sampleBtn = document.getElementById('sampleBtn');
+const titleBtn = document.getElementById('titleBtn');
+const addGroupBtn = document.getElementById('addGroupBtn');
 const undoBtn = document.getElementById('undoBtn');
 const redoBtn = document.getElementById('redoBtn');
 const helpBtn = document.getElementById('helpBtn');
@@ -193,13 +221,17 @@ const toast = document.getElementById('toast');
 let state = {
   nodes: [],
   edges: [],
+  groups: [],
+  diagram:{title:'',x:1450,y:900},
   view: {x:0,y:0,scale:1},
   selectedNodeId:null,
   selectedNodeIds:[],
   selectedEdgeId:null,
+  selectedGroupId:null,
   connectMode:false,
   connectSourceId:null,
-  nextId:1
+  nextId:1,
+  nextGroupId:1
 };
 
 let saveTimer = null;
@@ -211,7 +243,7 @@ const editSnapshots = new WeakMap();
 
 
 function contentSnapshot(){
-  return JSON.stringify({nodes:state.nodes,edges:state.edges,nextId:state.nextId});
+  return JSON.stringify({nodes:state.nodes,edges:state.edges,groups:state.groups,diagram:state.diagram,nextId:state.nextId,nextGroupId:state.nextGroupId});
 }
 
 function pushUndoSnapshot(snapshot=contentSnapshot()){
@@ -231,8 +263,11 @@ function restoreContentSnapshot(snapshot){
   const data=JSON.parse(snapshot);
   state.nodes=data.nodes||[];
   state.edges=data.edges||[];
+  state.groups=data.groups||[];
+  state.diagram=data.diagram||{title:'',x:1450,y:900};
   state.nextId=data.nextId||Math.max(0,...state.nodes.map(n=>Number(n.id)||0))+1;
-  state.selectedNodeId=null;state.selectedNodeIds=[];state.selectedEdgeId=null;state.connectMode=false;state.connectSourceId=null;
+  state.nextGroupId=data.nextGroupId||Math.max(0,...state.groups.map(g=>Number(g.id)||0))+1;
+  state.selectedNodeId=null;state.selectedNodeIds=[];state.selectedEdgeId=null;state.selectedGroupId=null;state.connectMode=false;state.connectSourceId=null;
   connectBtn.classList.remove('primary');connectBtn.textContent='機器を接続';
   renderAll();scheduleSave();
 }
@@ -269,7 +304,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.18',nextId:1,nodes:[],edges:[],view:{x:0,y:0,scale:1}};
+  return {version:'1.19',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -305,18 +340,27 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.18',
+    version:'1.19',
     nodes:state.nodes,
     edges:state.edges,
+    groups:state.groups,
+    diagram:state.diagram,
     view:state.view,
-    nextId:state.nextId
+    nextId:state.nextId,
+    nextGroupId:state.nextGroupId
   };
 }
 
 function makeSample(){
   return {
-    version:'1.18',
+    version:'1.19',
     nextId:7,
+    nextGroupId:3,
+    diagram:{title:'My Desktop Setup',x:1240,y:770},
+    groups:[
+      {id:1,title:'Input Devices',x:1180,y:880,w:240,h:380,color:'#38bdf8'},
+      {id:2,title:'Main System',x:1450,y:840,w:580,h:570,color:'#60a5fa'}
+    ],
     nodes:[
       {id:1,type:'PC',iconKey:'pc',size:'large',name:'Main PC',model:'Custom Build',note:'Gaming / Workstation',x:1500,y:1050},
       {id:2,type:'Monitor',iconKey:'monitor',size:'medium',name:'4K Monitor',model:'32-inch / 144Hz',note:'Main Display',x:1820,y:890},
@@ -367,13 +411,29 @@ function applyImportedState(data, save=true){
     label:e.label || e.type || 'Other',
     labelPos:Number.isFinite(+e.labelPos) ? +e.labelPos : .5
   })) : [];
+  state.groups = Array.isArray(data.groups) ? data.groups.map((g,i)=>({
+    id:g.id ?? i+1,
+    title:g.title || 'グループ',
+    x:Number.isFinite(+g.x)?+g.x:1200,
+    y:Number.isFinite(+g.y)?+g.y:800,
+    w:Math.max(220,Number.isFinite(+g.w)?+g.w:560),
+    h:Math.max(140,Number.isFinite(+g.h)?+g.h:340),
+    color:g.color || GROUP_ACCENTS[0]
+  })) : [];
+  state.diagram = {
+    title:data.diagram?.title || '',
+    x:Number.isFinite(+data.diagram?.x)?+data.diagram.x:1450,
+    y:Number.isFinite(+data.diagram?.y)?+data.diagram.y:900
+  };
   state.view = data.view && Number.isFinite(data.view.scale)
     ? {...data.view}
     : {x:0,y:0,scale:1};
   state.nextId = data.nextId || Math.max(0,...state.nodes.map(n=>Number(n.id)||0))+1;
+  state.nextGroupId = data.nextGroupId || Math.max(0,...state.groups.map(g=>Number(g.id)||0))+1;
   state.selectedNodeId = null;
   state.selectedNodeIds = [];
   state.selectedEdgeId = null;
+  state.selectedGroupId = null;
   state.connectMode = false;
   state.connectSourceId = null;
   connectBtn.classList.remove('primary');
@@ -388,6 +448,7 @@ function buildPalette(){
   DEVICE_GROUPS.forEach(group=>{
     const section=document.createElement('section');
     section.className='device-group';
+    section.style.setProperty('--cat-color',DEVICE_CATEGORY_ACCENTS[group.label]||'#94a3b8');
 
     const heading=document.createElement('div');
     heading.className='device-group-title';
@@ -400,6 +461,7 @@ function buildPalette(){
     group.items.forEach(([type,iconKey,size])=>{
       const button=document.createElement('button');
       button.className='palette-btn';
+      button.style.setProperty('--cat-color',deviceAccent(type));
       button.innerHTML=`<span class="palette-icon">${iconSvg(iconKey,'palette-svg')}</span><span class="palette-name">${escapeHtml(type)}</span>`;
       button.addEventListener('click',()=>addNode({type,iconKey,size}));
       grid.appendChild(button);
@@ -434,9 +496,288 @@ function addNode(device){
   scheduleSave();
 }
 
+
+function addGroup(){
+  pushUndoSnapshot();
+  const r=viewport.getBoundingClientRect();
+  const c=screenToWorld(r.left+r.width/2,r.top+r.height/2);
+  const group={
+    id:state.nextGroupId++,
+    title:'グループ',
+    x:snap(Math.max(0,Math.min(WORKSPACE.width-560,c.x-280))),
+    y:snap(Math.max(0,Math.min(WORKSPACE.height-340,c.y-170))),
+    w:560,h:340,
+    color:GROUP_ACCENTS[(state.groups.length)%GROUP_ACCENTS.length]
+  };
+  state.groups.push(group);
+  state.selectedGroupId=group.id;
+  state.selectedEdgeId=null;
+  clearNodeSelection();
+  renderAll();scheduleSave();
+}
+
+function syncGroupSelectionStyles(){
+  groupsLayer.querySelectorAll('.group-frame').forEach(el=>{
+    el.classList.toggle('selected',Number(el.dataset.id)===state.selectedGroupId);
+  });
+}
+
+function renderGroups(){
+  groupsLayer.innerHTML='';
+  state.groups.forEach(group=>{
+    const el=document.createElement('div');
+    el.className='group-frame'+(state.selectedGroupId===group.id?' selected':'');
+    el.dataset.id=group.id;
+    el.style.left=`${group.x}px`;
+    el.style.top=`${group.y}px`;
+    el.style.width=`${group.w}px`;
+    el.style.height=`${group.h}px`;
+    el.style.setProperty('--group-color',group.color);
+    el.innerHTML=`
+      <div class="group-title-bar">${escapeHtml(group.title)}</div>
+      <div class="group-resize" title="サイズ変更"></div>
+    `;
+    bindGroupInteractions(el,group);
+    groupsLayer.appendChild(el);
+  });
+}
+
+function bindGroupInteractions(el,group){
+  const title=el.querySelector('.group-title-bar');
+  const handle=el.querySelector('.group-resize');
+  let action=null;
+
+  const selectGroup=()=>{
+    state.selectedGroupId=group.id;
+    state.selectedEdgeId=null;
+    clearNodeSelection();
+    syncGroupSelectionStyles();
+    renderProperties();
+  };
+
+  title.addEventListener('pointerdown',e=>{
+    if(e.button!==0)return;
+    e.preventDefault();e.stopPropagation();
+    selectGroup();
+    action={kind:'move',id:e.pointerId,sx:e.clientX,sy:e.clientY,x:group.x,y:group.y,before:contentSnapshot(),moved:false};
+    title.setPointerCapture(e.pointerId);
+  });
+  title.addEventListener('dblclick',e=>{e.stopPropagation();selectGroup();document.getElementById('groupTitle')?.focus();});
+
+  handle.addEventListener('pointerdown',e=>{
+    if(e.button!==0)return;
+    e.preventDefault();e.stopPropagation();
+    selectGroup();
+    action={kind:'resize',id:e.pointerId,sx:e.clientX,sy:e.clientY,w:group.w,h:group.h,before:contentSnapshot(),moved:false};
+    handle.setPointerCapture(e.pointerId);
+  });
+
+  const move=e=>{
+    if(!action||action.id!==e.pointerId)return;
+    const dx=(e.clientX-action.sx)/state.view.scale;
+    const dy=(e.clientY-action.sy)/state.view.scale;
+    if(Math.abs(dx)+Math.abs(dy)>3)action.moved=true;
+    if(action.kind==='move'){
+      group.x=Math.max(0,Math.min(WORKSPACE.width-group.w,snap(action.x+dx)));
+      group.y=Math.max(0,Math.min(WORKSPACE.height-group.h,snap(action.y+dy)));
+      el.style.left=`${group.x}px`;el.style.top=`${group.y}px`;
+    }else{
+      group.w=Math.max(220,Math.min(WORKSPACE.width-group.x,snap(action.w+dx)));
+      group.h=Math.max(140,Math.min(WORKSPACE.height-group.y,snap(action.h+dy)));
+      el.style.width=`${group.w}px`;el.style.height=`${group.h}px`;
+    }
+  };
+  const up=e=>{
+    if(!action||action.id!==e.pointerId)return;
+    const current=action;
+    action=null;
+    if(current.moved){pushUndoSnapshot(current.before);scheduleSave();}
+    renderProperties();
+  };
+  title.addEventListener('pointermove',move);title.addEventListener('pointerup',up);
+  handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',up);
+}
+
+function renderGroupVisual(group){
+  const el=groupsLayer.querySelector(`[data-id="${group.id}"]`);
+  if(!el)return;
+  el.style.left=`${group.x}px`;el.style.top=`${group.y}px`;
+  el.style.width=`${group.w}px`;el.style.height=`${group.h}px`;
+  el.style.setProperty('--group-color',group.color);
+  el.querySelector('.group-title-bar').textContent=group.title;
+  scheduleSave();
+}
+
+function deleteSelectedGroup(){
+  if(state.selectedGroupId==null)return;
+  pushUndoSnapshot();
+  state.groups=state.groups.filter(g=>g.id!==state.selectedGroupId);
+  state.selectedGroupId=null;
+  renderAll();scheduleSave();showToast('グループ枠を削除しました');
+}
+
+function diagramTitleBounds(){
+  const title=(state.diagram?.title||'').trim();
+  if(!title)return null;
+  const w=Math.max(220,Math.min(1200,title.length*24+36));
+  return{x:state.diagram.x,y:state.diagram.y,w,h:46};
+}
+
+function renderDiagramTitle(){
+  diagramTitleLayer.innerHTML='';
+  const title=(state.diagram?.title||'').trim();
+  if(!title)return;
+  const el=document.createElement('div');
+  el.className='diagram-title-card';
+  el.style.left=`${state.diagram.x}px`;
+  el.style.top=`${state.diagram.y}px`;
+  el.textContent=title;
+  el.title='ドラッグで移動 / ダブルクリックで編集';
+  diagramTitleLayer.appendChild(el);
+
+  let drag=null;
+  el.addEventListener('pointerdown',e=>{
+    if(e.button!==0)return;
+    e.preventDefault();e.stopPropagation();
+    drag={id:e.pointerId,sx:e.clientX,sy:e.clientY,x:state.diagram.x,y:state.diagram.y,before:contentSnapshot(),moved:false};
+    el.setPointerCapture(e.pointerId);
+  });
+  el.addEventListener('pointermove',e=>{
+    if(!drag||drag.id!==e.pointerId)return;
+    const dx=(e.clientX-drag.sx)/state.view.scale,dy=(e.clientY-drag.sy)/state.view.scale;
+    if(Math.abs(dx)+Math.abs(dy)>3)drag.moved=true;
+    const tb=diagramTitleBounds();
+    state.diagram.x=Math.max(0,Math.min(WORKSPACE.width-(tb?.w||220),snap(drag.x+dx)));
+    state.diagram.y=Math.max(0,Math.min(WORKSPACE.height-46,snap(drag.y+dy)));
+    el.style.left=`${state.diagram.x}px`;el.style.top=`${state.diagram.y}px`;
+  });
+  el.addEventListener('pointerup',e=>{
+    if(!drag||drag.id!==e.pointerId)return;
+    const d=drag;drag=null;
+    if(d.moved){pushUndoSnapshot(d.before);scheduleSave();}
+  });
+  el.addEventListener('dblclick',e=>{e.stopPropagation();showTitleModal();});
+}
+
+function layoutBoundsRaw(includeTitle=true){
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  const include=(x,y,w,h)=>{
+    minX=Math.min(minX,x);minY=Math.min(minY,y);
+    maxX=Math.max(maxX,x+w);maxY=Math.max(maxY,y+h);
+  };
+  state.groups.forEach(g=>include(g.x,g.y,g.w,g.h));
+  state.nodes.forEach(n=>{const s=cardSize(n);include(n.x,n.y,s.w,s.h);});
+  if(includeTitle){
+    const t=diagramTitleBounds();
+    if(t)include(t.x,t.y,t.w,t.h);
+  }
+  if(minX===Infinity)return null;
+  return{x:minX,y:minY,w:maxX-minX,h:maxY-minY,maxX,maxY};
+}
+
+function showTitleModal(){
+  const current=state.diagram?.title||'';
+  openModal('構成図タイトル',`
+    <div class="mini-text">タイトルはキャンバス上に表示され、PNG出力にも含まれます。タイトル自体をドラッグして位置を変更できます。</div>
+    <label class="form-label">タイトル</label>
+    <input class="form-control" id="diagramTitleInput" maxlength="60" value="${escapeHtml(current)}" placeholder="例：My Desktop Setup">
+    <div class="welcome-actions">
+      <button class="btn primary" id="saveDiagramTitleBtn">反映</button>
+      <button class="btn" id="clearDiagramTitleBtn">タイトルを消す</button>
+    </div>
+  `);
+  modalDownloadLink.style.display='none';
+  copyJsonBtn.hidden=true;
+
+  const input=document.getElementById('diagramTitleInput');
+  setTimeout(()=>input.focus(),0);
+
+  document.getElementById('saveDiagramTitleBtn').onclick=()=>{
+    const value=input.value.trim();
+    const before=contentSnapshot();
+    if(value && !state.diagram.title){
+      const b=layoutBoundsRaw(false);
+      if(b){
+        state.diagram.x=Math.max(0,b.x);
+        state.diagram.y=Math.max(0,b.y-80);
+      }else{
+        const r=viewport.getBoundingClientRect();
+        const c=screenToWorld(r.left+r.width/2,r.top+r.height/2);
+        state.diagram.x=Math.max(0,c.x-180);state.diagram.y=Math.max(0,c.y-80);
+      }
+    }
+    state.diagram.title=value;
+    if(before!==contentSnapshot())pushUndoSnapshot(before);
+    renderDiagramTitle();scheduleSave();closeModal();
+  };
+  document.getElementById('clearDiagramTitleBtn').onclick=()=>{
+    const before=contentSnapshot();
+    state.diagram.title='';
+    if(before!==contentSnapshot())pushUndoSnapshot(before);
+    renderDiagramTitle();scheduleSave();closeModal();
+  };
+}
+
+function renderSmartGuides(guideX,guideY){
+  guidesLayer.innerHTML='';
+  if(Number.isFinite(guideX)){
+    const line=document.createElement('div');
+    line.className='smart-guide vertical';
+    line.style.left=`${guideX}px`;guidesLayer.appendChild(line);
+  }
+  if(Number.isFinite(guideY)){
+    const line=document.createElement('div');
+    line.className='smart-guide horizontal';
+    line.style.top=`${guideY}px`;guidesLayer.appendChild(line);
+  }
+}
+
+function clearSmartGuides(){guidesLayer.innerHTML='';}
+
+function smartGuideCorrection(positions,dx,dy){
+  if(!positions.length)return{dx,dy,guideX:null,guideY:null};
+  const ids=new Set(positions.map(p=>p.id));
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  positions.forEach(pos=>{
+    const n=state.nodes.find(node=>node.id===pos.id);
+    if(!n)return;
+    const s=cardSize(n);
+    minX=Math.min(minX,pos.x);minY=Math.min(minY,pos.y);
+    maxX=Math.max(maxX,pos.x+s.w);maxY=Math.max(maxY,pos.y+s.h);
+  });
+  if(minX===Infinity)return{dx,dy,guideX:null,guideY:null};
+
+  const movingX=[minX+dx,(minX+maxX)/2+dx,maxX+dx];
+  const movingY=[minY+dy,(minY+maxY)/2+dy,maxY+dy];
+  const targetX=[],targetY=[];
+  state.nodes.filter(n=>!ids.has(n.id)).forEach(n=>{
+    const s=cardSize(n);
+    targetX.push(n.x,n.x+s.w/2,n.x+s.w);
+    targetY.push(n.y,n.y+s.h/2,n.y+s.h);
+  });
+  const threshold=8/state.view.scale;
+  let bestX=null,bestY=null;
+  movingX.forEach(mx=>targetX.forEach(tx=>{
+    const diff=tx-mx;
+    if(Math.abs(diff)<=threshold && (!bestX||Math.abs(diff)<Math.abs(bestX.diff)))bestX={diff,line:tx};
+  }));
+  movingY.forEach(my=>targetY.forEach(ty=>{
+    const diff=ty-my;
+    if(Math.abs(diff)<=threshold && (!bestY||Math.abs(diff)<Math.abs(bestY.diff)))bestY={diff,line:ty};
+  }));
+  return{
+    dx:dx+(bestX?.diff||0),
+    dy:dy+(bestY?.diff||0),
+    guideX:bestX?.line??null,
+    guideY:bestY?.line??null
+  };
+}
+
 function renderAll(){
-  renderNodes();
+  renderGroups();
   renderEdges();
+  renderNodes();
+  renderDiagramTitle();
   renderProperties();
 }
 
@@ -453,6 +794,7 @@ function setSingleNodeSelection(id){
   state.selectedNodeId=id;
   state.selectedNodeIds=id==null?[]:[id];
   state.selectedEdgeId=null;
+  state.selectedGroupId=null;
 }
 
 function clearNodeSelection(){
@@ -468,6 +810,7 @@ function toggleNodeSelection(id){
   state.selectedNodeIds=ids;
   state.selectedNodeId=ids.includes(id)?id:(ids[ids.length-1]??null);
   state.selectedEdgeId=null;
+  state.selectedGroupId=null;
 }
 
 function syncNodeSelectionStyles(){
@@ -492,6 +835,7 @@ function renderNodes(){
       (node.locked ? ' locked' : '') +
       (state.connectSourceId === node.id ? ' connect-source' : '');
     el.dataset.id = node.id;
+    el.style.setProperty('--cat-color',deviceAccent(node.type));
     el.style.left = `${node.x}px`;
     el.style.top = `${node.y}px`;
     el.style.width = `${s.w}px`;
@@ -558,16 +902,21 @@ function bindNodeDrag(el,node){
 
   el.addEventListener('pointermove', e=>{
     if(!drag || drag.id !== e.pointerId) return;
-    const dx=(e.clientX-drag.sx)/state.view.scale;
-    const dy=(e.clientY-drag.sy)/state.view.scale;
+    let dx=(e.clientX-drag.sx)/state.view.scale;
+    let dy=(e.clientY-drag.sy)/state.view.scale;
     if(Math.abs(dx)+Math.abs(dy)>3) drag.moved=true;
+    const guided=smartGuideCorrection(drag.positions,dx,dy);
+    dx=guided.dx;dy=guided.dy;
+    renderSmartGuides(guided.guideX,guided.guideY);
 
     drag.positions.forEach(pos=>{
       const target=state.nodes.find(n=>n.id===pos.id);
       if(!target)return;
       const s=cardSize(target);
-      target.x=Math.max(0,Math.min(WORKSPACE.width-s.w,snap(pos.x+dx)));
-      target.y=Math.max(0,Math.min(WORKSPACE.height-s.h,snap(pos.y+dy)));
+      const nextX=Number.isFinite(guided.guideX)?pos.x+dx:snap(pos.x+dx);
+      const nextY=Number.isFinite(guided.guideY)?pos.y+dy:snap(pos.y+dy);
+      target.x=Math.max(0,Math.min(WORKSPACE.width-s.w,nextX));
+      target.y=Math.max(0,Math.min(WORKSPACE.height-s.h,nextY));
       const targetEl=nodesLayer.querySelector(`[data-id="${target.id}"]`);
       if(targetEl){
         targetEl.style.left=`${target.x}px`;
@@ -583,6 +932,7 @@ function bindNodeDrag(el,node){
     const changed=drag.moved;
     const before=drag.before;
     drag=null;
+    clearSmartGuides();
     if(changed){pushUndoSnapshot(before);scheduleSave();}
   });
 }
@@ -613,6 +963,7 @@ function handleConnectNode(nodeId){
   };
   state.edges.push(edge);
   state.selectedEdgeId = edge.id;
+  state.selectedGroupId = null;
   clearNodeSelection();
   state.connectMode = false;
   state.connectSourceId = null;
@@ -756,6 +1107,7 @@ function renderEdges(){
     hit.addEventListener('click', e=>{
       e.stopPropagation();
       state.selectedEdgeId=edge.id;
+      state.selectedGroupId=null;
       clearNodeSelection();
       renderAll();
     });
@@ -778,6 +1130,7 @@ function renderEdges(){
     text.addEventListener('click',e=>{
       e.stopPropagation();
       state.selectedEdgeId=edge.id;
+      state.selectedGroupId=null;
       clearNodeSelection();
       renderAll();
     });
@@ -793,6 +1146,7 @@ function updateNodeVisual(node){
   el.classList.add(`size-${node.size}`);
   el.style.width=`${s.w}px`;
   el.style.height=`${s.h}px`;
+  el.style.setProperty('--cat-color',deviceAccent(node.type));
   el.querySelector('.node-icon').innerHTML=iconSvg(nodeIconKey(node),'node-svg');
   el.querySelector('.node-title').textContent=node.name;
   el.querySelector('.node-type').textContent=node.type;
@@ -896,6 +1250,51 @@ function alignSelected(mode){
 }
 
 function renderProperties(){
+  const group=state.groups.find(g=>g.id===state.selectedGroupId);
+  if(group){
+    properties.className='';
+    properties.innerHTML=`
+      <div class="form-section">
+        <h3>グループ枠</h3>
+        <label class="form-label">グループ名</label>
+        <input class="form-control" id="groupTitle" value="${escapeHtml(group.title)}">
+        <div class="form-grid">
+          <div>
+            <label class="form-label">幅</label>
+            <input class="form-control" id="groupWidth" type="number" min="220" max="3200" step="20" value="${Math.round(group.w)}">
+          </div>
+          <div>
+            <label class="form-label">高さ</label>
+            <input class="form-control" id="groupHeight" type="number" min="140" max="2200" step="20" value="${Math.round(group.h)}">
+          </div>
+        </div>
+        <label class="form-label">アクセント色</label>
+        <input class="form-control color-control" id="groupColor" type="color" value="${escapeHtml(group.color)}">
+        <div class="mini-text" style="margin-top:8px">見出し部分をドラッグして移動、右下のハンドルでサイズ変更できます。</div>
+      </div>
+      <button class="btn danger" id="deleteGroupBtn" style="width:100%">グループ枠を削除</button>
+    `;
+    bindTrackedText(document.getElementById('groupTitle'),e=>{group.title=e.target.value;renderGroupVisual(group)});
+    const updateSize=()=>{
+      group.w=Math.max(220,Math.min(WORKSPACE.width-group.x,+document.getElementById('groupWidth').value||group.w));
+      group.h=Math.max(140,Math.min(WORKSPACE.height-group.y,+document.getElementById('groupHeight').value||group.h));
+      renderGroupVisual(group);
+    };
+    const widthEl=document.getElementById('groupWidth'),heightEl=document.getElementById('groupHeight');
+    [widthEl,heightEl].forEach(el=>{
+      el.addEventListener('focus',()=>beginTrackedEdit(el));
+      el.addEventListener('change',()=>{updateSize();endTrackedEdit(el)});
+      el.addEventListener('blur',()=>endTrackedEdit(el));
+    });
+    const colorEl=document.getElementById('groupColor');
+    colorEl.addEventListener('focus',()=>beginTrackedEdit(colorEl));
+    colorEl.addEventListener('input',()=>{group.color=colorEl.value;renderGroupVisual(group)});
+    colorEl.addEventListener('change',()=>endTrackedEdit(colorEl));
+    colorEl.addEventListener('blur',()=>endTrackedEdit(colorEl));
+    document.getElementById('deleteGroupBtn').onclick=deleteSelectedGroup;
+    return;
+  }
+
   const edge=state.edges.find(e=>e.id===state.selectedEdgeId);
   if(edge){
     properties.className='';
@@ -1064,6 +1463,10 @@ function renderProperties(){
 }
 
 function deleteSelection(){
+  if(state.selectedGroupId!=null){
+    deleteSelectedGroup();
+    return;
+  }
   if(state.selectedEdgeId){
     pushUndoSnapshot();
     state.edges=state.edges.filter(e=>e.id!==state.selectedEdgeId);
@@ -1128,15 +1531,10 @@ function centerWorkspace(){
 }
 
 function fitAll(){
-  if(!state.nodes.length){centerWorkspace();return}
-  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-  state.nodes.forEach(node=>{
-    const s=cardSize(node);
-    minX=Math.min(minX,node.x);minY=Math.min(minY,node.y);
-    maxX=Math.max(maxX,node.x+s.w);maxY=Math.max(maxY,node.y+s.h);
-  });
+  const b=layoutBoundsRaw(true);
+  if(!b){centerWorkspace();return}
   const pad=90;
-  minX-=pad;minY-=pad;maxX+=pad;maxY+=pad;
+  const minX=b.x-pad,minY=b.y-pad,maxX=b.maxX+pad,maxY=b.maxY+pad;
   const bw=Math.max(1,maxX-minX),bh=Math.max(1,maxY-minY);
   const r=viewport.getBoundingClientRect();
   const scale=Math.max(.35,Math.min(1.35,Math.min(r.width/bw,r.height/bh)));
@@ -1205,6 +1603,7 @@ viewport.addEventListener('pointerdown',e=>{
   if(state.connectMode)return;
   if(e.button!==0&&e.button!==1)return;
   if(e.target.closest('.node'))return;
+  if(e.target.closest('.group-title-bar')||e.target.closest('.group-resize')||e.target.closest('.diagram-title-card'))return;
   if(e.target.closest('.view-controls'))return;
   if(e.target.classList.contains('edge-hit')||e.target.classList.contains('edge-label'))return;
 
@@ -1235,10 +1634,12 @@ viewport.addEventListener('pointerup',e=>{
   const edge=nearestEdgeAt(p.x,p.y,16/state.view.scale);
   if(edge){
     state.selectedEdgeId=edge.id;
+    state.selectedGroupId=null;
     clearNodeSelection();
     renderAll();
   }else{
     state.selectedEdgeId=null;
+    state.selectedGroupId=null;
     clearNodeSelection();
     renderAll();
   }
@@ -1274,11 +1675,14 @@ window.addEventListener('keydown',e=>{
 
 undoBtn.addEventListener('click',undo);
 redoBtn.addEventListener('click',redo);
+addGroupBtn.addEventListener('click',addGroup);
+titleBtn.addEventListener('click',showTitleModal);
 
 connectBtn.addEventListener('click',()=>{
   state.connectMode=!state.connectMode;
   state.connectSourceId=null;
   state.selectedEdgeId=null;
+  state.selectedGroupId=null;
   connectBtn.classList.toggle('primary',state.connectMode);
   connectBtn.textContent=state.connectMode?'接続モード ON':'機器を接続';
   renderNodes();
@@ -1330,8 +1734,8 @@ function showHelpModal(isFirst=false){
     <div class="welcome-grid">
       <div class="welcome-card"><strong>① 機器を追加</strong><p>左のデバイス一覧から追加し、カード全体をドラッグして配置します。</p></div>
       <div class="welcome-card"><strong>② ケーブルを接続</strong><p>「機器を接続」を押し、接続する2台を順番にクリックします。</p></div>
-      <div class="welcome-card"><strong>③ 詳細を編集</strong><p>機器やケーブルを選択すると、右側で型番・メモ・固定・ラベル位置などを編集できます。</p></div>
-      <div class="welcome-card"><strong>④ 保存・出力</strong><p>作業はブラウザ内に自動保存。JSONでバックアップし、PNG画像にも書き出せます。</p></div>
+      <div class="welcome-card"><strong>③ 整えて見やすく</strong><p>スマートガイド・複数選択・整列・グループ枠で、構成を見やすく整理できます。</p></div>
+      <div class="welcome-card"><strong>④ タイトル・出力</strong><p>構成図タイトルを付け、JSONでバックアップしたりPNG画像として書き出せます。</p></div>
     </div>
     <div class="shortcut-list">
       <kbd>Ctrl + Z</kbd><span>元に戻す</span>
@@ -1432,19 +1836,22 @@ jsonFileInput.addEventListener('change',async()=>{
 });
 
 function contentBounds(){
-  if(!state.nodes.length)return{x:0,y:0,w:WORKSPACE.width,h:WORKSPACE.height};
-  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-  state.nodes.forEach(node=>{
-    const s=cardSize(node);
-    minX=Math.min(minX,node.x);minY=Math.min(minY,node.y);
-    maxX=Math.max(maxX,node.x+s.w);maxY=Math.max(maxY,node.y+s.h);
-  });
+  const b=layoutBoundsRaw(true);
+  if(!b)return{x:0,y:0,w:WORKSPACE.width,h:WORKSPACE.height};
   const pad=120;
   return{
-    x:Math.max(0,minX-pad),y:Math.max(0,minY-pad),
-    w:Math.min(WORKSPACE.width,maxX+pad)-Math.max(0,minX-pad),
-    h:Math.min(WORKSPACE.height,maxY+pad)-Math.max(0,minY-pad)
+    x:Math.max(0,b.x-pad),y:Math.max(0,b.y-pad),
+    w:Math.min(WORKSPACE.width,b.maxX+pad)-Math.max(0,b.x-pad),
+    h:Math.min(WORKSPACE.height,b.maxY+pad)-Math.max(0,b.y-pad)
   };
+}
+
+function hexToRgba(hex,alpha){
+  const value=String(hex||'#64748b').replace('#','');
+  const full=value.length===3?value.split('').map(c=>c+c).join(''):value;
+  const n=parseInt(full,16);
+  const r=(n>>16)&255,g=(n>>8)&255,b=n&255;
+  return `rgba(${r},${g},${b},${alpha})`;
 }
 
 function roundRect(ctx,x,y,w,h,r){
@@ -1513,6 +1920,31 @@ pngBtn.addEventListener('click',async()=>{
       ctx.strokeStyle=y%100===0?'#222936':'#171d27';ctx.stroke();
     }
 
+
+    if((state.diagram?.title||'').trim()){
+      ctx.save();
+      ctx.fillStyle='#f1f5f9';
+      ctx.font='700 24px "Segoe UI",Arial,sans-serif';
+      ctx.textAlign='left';
+      ctx.fillText(state.diagram.title,state.diagram.x-bounds.x,state.diagram.y-bounds.y+30);
+      ctx.restore();
+    }
+
+    state.groups.forEach(group=>{
+      const x=group.x-bounds.x,y=group.y-bounds.y;
+      ctx.save();
+      ctx.fillStyle=hexToRgba(group.color,.055);
+      ctx.strokeStyle=hexToRgba(group.color,.6);
+      ctx.lineWidth=1.5;
+      ctx.setLineDash([8,6]);
+      roundRect(ctx,x,y,group.w,group.h,16);ctx.fill();ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle=hexToRgba(group.color,.95);
+      ctx.font='700 11px "Segoe UI",Arial,sans-serif';
+      ctx.fillText(group.title,x+14,y+21);
+      ctx.restore();
+    });
+
     state.edges.forEach(edge=>{
       const cable=CABLES[edge.type]||CABLES.Other;
       ctx.save();
@@ -1538,6 +1970,8 @@ pngBtn.addEventListener('click',async()=>{
       ctx.save();
       ctx.fillStyle='#1d2430';ctx.strokeStyle='#3b455a';ctx.lineWidth=1;
       roundRect(ctx,x,y,s.w,s.h,14);ctx.fill();ctx.stroke();
+      ctx.fillStyle=deviceAccent(node.type);
+      ctx.fillRect(x+14,y+1,s.w-28,3);
 
       ctx.textAlign='left';
       ctx.fillStyle='#edf2f7';ctx.font='700 13px "Segoe UI",Arial,sans-serif';

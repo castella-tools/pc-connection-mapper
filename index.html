@@ -9,7 +9,7 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
   <link rel="apple-touch-icon" href="./icon-192.png">
-  <link rel="stylesheet" href="./styles.css?v=1.18">
+  <link rel="stylesheet" href="./styles.css?v=1.19">
 </head>
 <body>
   <div id="app" class="app">
@@ -17,7 +17,7 @@
       <div class="brand">
         <span class="brand-mark">⌘</span>
         <span>PC Connection Mapper</span>
-        <span class="version">v1.18</span>
+        <span class="version">v1.19</span>
       </div>
 
       <div class="save-status" id="saveStatus">自動保存</div>
@@ -29,6 +29,7 @@
         <button class="btn icon-action" id="redoBtn" title="やり直す (Ctrl+Y / Ctrl+Shift+Z)" disabled>↷</button>
         <button class="btn" id="newBtn">新規作成</button>
         <button class="btn" id="sampleBtn">サンプル</button>
+        <button class="btn" id="titleBtn">タイトル</button>
         <button class="btn" id="connectBtn">機器を接続</button>
         <button class="btn" id="jsonSaveBtn">JSON保存</button>
         <button class="btn" id="jsonLoadBtn">JSON読込</button>
@@ -47,17 +48,21 @@
           <input id="snapToggle" type="checkbox" checked>
           <span>20pxグリッドに吸着</span>
         </label>
+        <button class="btn group-add-btn" id="addGroupBtn">＋ グループ枠を追加</button>
       </div>
     </aside>
 
     <main class="viewport" id="viewport">
       <div class="world" id="world">
         <svg id="links" class="links"></svg>
+        <div id="groups" class="groups-layer"></div>
+        <div id="diagramTitleLayer" class="diagram-title-layer"></div>
         <div id="nodes" class="nodes"></div>
+        <div id="guides" class="guides-layer"></div>
       </div>
 
       <div class="canvas-hint">
-        カードをドラッグ / Shift+クリックで複数選択 / 空白ドラッグで移動 / ホイールでズーム
+        カードをドラッグ / 自動ガイドで整列 / Shift+クリックで複数選択 / 空白ドラッグで移動
       </div>
 
       <div class="view-controls" id="viewControls">
@@ -91,11 +96,11 @@
 
   <div class="toast" id="toast"></div>
 
-  <script type="module" src="./app.js?v=1.18"></script>
+  <script type="module" src="./app.js?v=1.19"></script>
   <script>
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=1.18', { updateViaCache: 'none' }).catch(console.warn);
+        navigator.serviceWorker.register('./sw.js?v=1.19', { updateViaCache: 'none' }).catch(console.warn);
       });
     }
   </script>
