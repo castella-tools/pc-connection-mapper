@@ -1,3 +1,4 @@
+console.info('PC Connection Mapper app.js v1.12 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -94,7 +95,7 @@ function contentSnapshot(){
 
 function pushUndoSnapshot(snapshot=contentSnapshot()){
   if(!snapshot) return;
-  if(history.undo.at(-1)!==snapshot) history.undo.push(snapshot);
+  if(history.undo[history.undo.length-1]!==snapshot) history.undo.push(snapshot);
   if(history.undo.length>HISTORY_LIMIT) history.undo.shift();
   history.redo=[];
   updateHistoryButtons();
@@ -147,7 +148,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.1',nextId:1,nodes:[],edges:[],view:{x:0,y:0,scale:1}};
+  return {version:'1.12',nextId:1,nodes:[],edges:[],view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -183,7 +184,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.1',
+    version:'1.12',
     nodes:state.nodes,
     edges:state.edges,
     view:state.view,
@@ -193,7 +194,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.1',
+    version:'1.12',
     nextId:7,
     nodes:[
       {id:1,type:'PC',icon:'🖥️',size:'large',name:'Main PC',model:'Custom Build',note:'Gaming / Workstation',x:1500,y:1050},
@@ -915,7 +916,10 @@ function showHelpModal(isFirst=false){
     });
     document.getElementById('introSampleBtn').addEventListener('click',()=>{
       localStorage.setItem(INTRO_KEY,'1');
-      closeModal();requestAnimationFrame(fitAll);
+      applyImportedState(makeSample());
+      history.undo=[];history.redo=[];updateHistoryButtons();
+      closeModal();
+      requestAnimationFrame(()=>{fitAll();scheduleSave()});
     });
   }
 }
