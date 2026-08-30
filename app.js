@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.21 loaded');
+console.info('PC Connection Mapper app.js v1.22 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -304,7 +304,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.21',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.22',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -340,7 +340,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.21',
+    version:'1.22',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -353,7 +353,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.21',
+    version:'1.22',
     nextId:7,
     nextGroupId:3,
     diagram:{title:'My Desktop Setup',x:1240,y:770},
@@ -1925,6 +1925,58 @@ async function preparePngDeviceIcons(){
   return images;
 }
 
+function canvasEllipsis(ctx,text,maxWidth){
+  const value=String(text??'');
+  if(ctx.measureText(value).width<=maxWidth)return value;
+  const ellipsis='…';
+  if(ctx.measureText(ellipsis).width>maxWidth)return '';
+  let lo=0,hi=value.length;
+  while(lo<hi){
+    const mid=Math.ceil((lo+hi)/2);
+    const candidate=value.slice(0,mid)+ellipsis;
+    if(ctx.measureText(candidate).width<=maxWidth)lo=mid;
+    else hi=mid-1;
+  }
+  return value.slice(0,lo)+ellipsis;
+}
+
+function canvasWrapLines(ctx,text,maxWidth,maxLines){
+  const src=String(text??'').replace(/\r/g,'');
+  const paragraphs=src.split('\n');
+  const lines=[];
+
+  for(const paragraph of paragraphs){
+    if(lines.length>=maxLines)break;
+    if(paragraph===''){
+      lines.push('');
+      continue;
+    }
+
+    let current='';
+    for(const ch of paragraph){
+      const test=current+ch;
+      if(current && ctx.measureText(test).width>maxWidth){
+        lines.push(current);
+        current=ch;
+        if(lines.length>=maxLines)break;
+      }else{
+        current=test;
+      }
+    }
+    if(lines.length>=maxLines)break;
+    if(current)lines.push(current);
+  }
+
+  if(lines.length>maxLines)lines.length=maxLines;
+
+  const consumed=lines.join('').replace(/\s/g,'').length;
+  const original=src.replace(/\s/g,'').length;
+  if(original>consumed && lines.length){
+    lines[lines.length-1]=canvasEllipsis(ctx,lines[lines.length-1]+'…',maxWidth);
+  }
+  return lines;
+}
+
 function roundRect(ctx,x,y,w,h,r){
   const rr=Math.min(r,w/2,h/2);
   ctx.beginPath();
@@ -2059,30 +2111,50 @@ pngBtn.addEventListener('click',async()=>{
       const iconImg=pngIcons.get(cacheKey);
       if(iconImg) ctx.drawImage(iconImg,iconBoxX+4,iconBoxY+4,20,20);
 
+      // Clip all text to the inside of the card so PNG behaves like the live HTML card.
+      ctx.save();
+      ctx.beginPath();
+      roundRect(ctx,x+1,y+1,s.w-2,s.h-2,13);
+      ctx.clip();
+
       const textX=x+46;
       const titleY=y+(node.size==='xlarge'?27:21);
+      const headerRight=x+s.w-10;
+      const headerWidth=Math.max(24,headerRight-textX);
+      const bodyX=x+(node.size==='xlarge'?13:10);
+      const bodyWidth=Math.max(24,s.w-(node.size==='xlarge'?26:20));
+      const uiFont='"Segoe UI","Yu Gothic UI","Yu Gothic","Meiryo",Arial,sans-serif';
+
       ctx.textAlign='left';
       ctx.fillStyle='#edf2f7';
-      ctx.font=`700 ${node.size==='xlarge'?15:13}px "Segoe UI",Arial,sans-serif`;
-      ctx.fillText(node.name||node.type,textX,titleY);
+      ctx.font=`700 ${node.size==='xlarge'?15:13}px ${uiFont}`;
+      ctx.fillText(canvasEllipsis(ctx,node.name||node.type,headerWidth),textX,titleY);
 
-      ctx.fillStyle='#909bad';ctx.font='9px "Segoe UI",Arial,sans-serif';
-      ctx.fillText(node.type,textX,titleY+13);
+      ctx.fillStyle='#909bad';
+      ctx.font=`9px ${uiFont}`;
+      ctx.fillText(canvasEllipsis(ctx,node.type,headerWidth),textX,titleY+13);
 
       let noteY=y+(node.size==='xlarge'?67:52);
       if(node.model){
         ctx.fillStyle='#9cabc0';
-        ctx.font=`${node.size==='xlarge'?11:10}px "Segoe UI",Arial,sans-serif`;
-        ctx.fillText(node.model,textX,titleY+27);
+        ctx.font=`${node.size==='xlarge'?11:10}px ${uiFont}`;
+        ctx.fillText(canvasEllipsis(ctx,node.model,headerWidth),textX,titleY+27);
         noteY=y+(node.size==='xlarge'?82:64);
       }
 
-      ctx.fillStyle='#aab4c5';ctx.font=`${node.size==='xlarge'?11:9}px "Segoe UI",Arial,sans-serif`;
+      ctx.fillStyle='#aab4c5';
+      ctx.font=`${node.size==='xlarge'?11:9}px ${uiFont}`;
       const noteLimit=node.size==='xlarge'?6:2;
       const lineHeight=node.size==='xlarge'?16:12;
-      String(node.note||'').split(/\n/).slice(0,noteLimit).forEach((line,i)=>{
-        ctx.fillText(line,x+(node.size==='xlarge'?13:10),noteY+i*lineHeight);
+      const availableHeight=Math.max(0,y+s.h-10-noteY);
+      const heightLines=Math.max(0,Math.floor(availableHeight/lineHeight)+1);
+      const effectiveLimit=Math.min(noteLimit,heightLines);
+      const noteLines=canvasWrapLines(ctx,node.note||'',bodyWidth,effectiveLimit);
+      noteLines.forEach((line,i)=>{
+        ctx.fillText(canvasEllipsis(ctx,line,bodyWidth),bodyX,noteY+i*lineHeight);
       });
+
+      ctx.restore();
 
       if(node.locked){
         ctx.font='700 7px "Segoe UI",Arial,sans-serif';
