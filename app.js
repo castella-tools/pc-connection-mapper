@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.12 loaded');
+console.info('PC Connection Mapper app.js v1.13 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -24,13 +24,44 @@ const CARD_SIZES = {
 };
 
 const CABLES = {
-  'USB-A':{color:'#60a5fa'}, 'USB-C':{color:'#60a5fa'}, 'USB4':{color:'#60a5fa'},
-  'Thunderbolt':{color:'#60a5fa'}, 'HDMI':{color:'#a78bfa'}, 'DisplayPort':{color:'#a78bfa'},
-  '3.5mm':{color:'#34d399'}, 'RCA':{color:'#34d399'}, 'XLR':{color:'#34d399'},
-  'Optical':{color:'#34d399'}, 'LAN':{color:'#fb923c'}, 'AC Power':{color:'#94a3b8'},
-  'Bluetooth':{color:'#22d3ee',dash:true}, 'Wi-Fi':{color:'#facc15',dash:true},
+  'USB-A':{color:'#60a5fa'},
+  'USB-B':{color:'#60a5fa'},
+  'USB-C':{color:'#60a5fa'},
+  'Micro-USB':{color:'#60a5fa'},
+  'USB4':{color:'#60a5fa'},
+  'Thunderbolt':{color:'#60a5fa'},
+
+  'HDMI':{color:'#a78bfa'},
+  'DisplayPort':{color:'#a78bfa'},
+  'DVI':{color:'#a78bfa'},
+  'VGA':{color:'#a78bfa'},
+
+  '3.5mm':{color:'#34d399'},
+  '6.3mm':{color:'#34d399'},
+  'RCA':{color:'#34d399'},
+  'XLR':{color:'#34d399'},
+  'Optical':{color:'#34d399'},
+
+  'LAN':{color:'#fb923c'},
+
+  'AC Power':{color:'#94a3b8'},
+  'DC Power':{color:'#94a3b8'},
+
+  'Bluetooth':{color:'#22d3ee',dash:true},
+  'Wi-Fi':{color:'#facc15',dash:true},
+
   'Other':{color:'#f472b6'}
 };
+
+const CABLE_GROUPS = [
+  {label:'USB / 高速I/O', items:['USB-A','USB-B','USB-C','Micro-USB','USB4','Thunderbolt']},
+  {label:'映像', items:['HDMI','DisplayPort','DVI','VGA']},
+  {label:'音声', items:['3.5mm','6.3mm','RCA','XLR','Optical']},
+  {label:'ネットワーク', items:['LAN']},
+  {label:'電源', items:['AC Power','DC Power']},
+  {label:'無線', items:['Bluetooth','Wi-Fi']},
+  {label:'その他', items:['Other']}
+];
 
 const app = document.getElementById('app');
 const viewport = document.getElementById('viewport');
@@ -148,7 +179,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.12',nextId:1,nodes:[],edges:[],view:{x:0,y:0,scale:1}};
+  return {version:'1.13',nextId:1,nodes:[],edges:[],view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -184,7 +215,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.12',
+    version:'1.13',
     nodes:state.nodes,
     edges:state.edges,
     view:state.view,
@@ -194,7 +225,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.12',
+    version:'1.13',
     nextId:7,
     nodes:[
       {id:1,type:'PC',icon:'🖥️',size:'large',name:'Main PC',model:'Custom Build',note:'Gaming / Workstation',x:1500,y:1050},
@@ -525,6 +556,14 @@ function optionList(values,current,labels=null){
   return values.map(v=>`<option value="${escapeHtml(v)}" ${v===current?'selected':''}>${escapeHtml(labels?.[v]||v)}</option>`).join('');
 }
 
+function cableOptionGroups(current){
+  return CABLE_GROUPS.map(group=>`
+    <optgroup label="${escapeHtml(group.label)}">
+      ${group.items.map(item=>`<option value="${escapeHtml(item)}" ${item===current?'selected':''}>${escapeHtml(item)}</option>`).join('')}
+    </optgroup>
+  `).join('');
+}
+
 function renderProperties(){
   const edge=state.edges.find(e=>e.id===state.selectedEdgeId);
   if(edge){
@@ -535,8 +574,8 @@ function renderProperties(){
       <div class="form-section">
         <h3>ケーブル</h3>
         <div class="mini-text">${escapeHtml(a?.name)} → ${escapeHtml(b?.name)}</div>
-        <label class="form-label">種類</label>
-        <select class="form-control" id="edgeType">${optionList(Object.keys(CABLES),edge.type)}</select>
+        <label class="form-label">接続種類</label>
+        <select class="form-control" id="edgeType">${cableOptionGroups(edge.type)}</select>
         <label class="form-label">表示ラベル</label>
         <input class="form-control" id="edgeLabel" value="${escapeHtml(edge.label)}">
         <label class="form-label">線の形</label>
