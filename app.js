@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.17 loaded');
+console.info('PC Connection Mapper app.js v1.18 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -195,6 +195,7 @@ let state = {
   edges: [],
   view: {x:0,y:0,scale:1},
   selectedNodeId:null,
+  selectedNodeIds:[],
   selectedEdgeId:null,
   connectMode:false,
   connectSourceId:null,
@@ -231,7 +232,7 @@ function restoreContentSnapshot(snapshot){
   state.nodes=data.nodes||[];
   state.edges=data.edges||[];
   state.nextId=data.nextId||Math.max(0,...state.nodes.map(n=>Number(n.id)||0))+1;
-  state.selectedNodeId=null;state.selectedEdgeId=null;state.connectMode=false;state.connectSourceId=null;
+  state.selectedNodeId=null;state.selectedNodeIds=[];state.selectedEdgeId=null;state.connectMode=false;state.connectSourceId=null;
   connectBtn.classList.remove('primary');connectBtn.textContent='機器を接続';
   renderAll();scheduleSave();
 }
@@ -268,7 +269,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.17',nextId:1,nodes:[],edges:[],view:{x:0,y:0,scale:1}};
+  return {version:'1.18',nextId:1,nodes:[],edges:[],view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -304,7 +305,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.17',
+    version:'1.18',
     nodes:state.nodes,
     edges:state.edges,
     view:state.view,
@@ -314,7 +315,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.17',
+    version:'1.18',
     nextId:7,
     nodes:[
       {id:1,type:'PC',iconKey:'pc',size:'large',name:'Main PC',model:'Custom Build',note:'Gaming / Workstation',x:1500,y:1050},
@@ -354,7 +355,8 @@ function applyImportedState(data, save=true){
     size:n.size || deviceTypeInfo(n.type).size || 'medium',
     iconKey:n.iconKey || deviceTypeInfo(n.type).iconKey || 'other',
     model:n.model || '',
-    note:n.note || ''
+    note:n.note || '',
+    locked:!!n.locked
   })) : [];
   state.edges = Array.isArray(data.edges) ? data.edges.map(e=>({
     ...e,
@@ -362,13 +364,15 @@ function applyImportedState(data, save=true){
     bend:Number.isFinite(+e.bend) ? +e.bend : .5,
     fromSide:e.fromSide || 'auto',
     toSide:e.toSide || 'auto',
-    label:e.label || e.type || 'Other'
+    label:e.label || e.type || 'Other',
+    labelPos:Number.isFinite(+e.labelPos) ? +e.labelPos : .5
   })) : [];
   state.view = data.view && Number.isFinite(data.view.scale)
     ? {...data.view}
     : {x:0,y:0,scale:1};
   state.nextId = data.nextId || Math.max(0,...state.nodes.map(n=>Number(n.id)||0))+1;
   state.selectedNodeId = null;
+  state.selectedNodeIds = [];
   state.selectedEdgeId = null;
   state.connectMode = false;
   state.connectSourceId = null;
@@ -418,11 +422,13 @@ function addNode(device){
     name:device.type,
     model:'',
     note:'',
+    locked:false,
     x:snap(Math.max(0,Math.min(WORKSPACE.width-200, center.x-80))),
     y:snap(Math.max(0,Math.min(WORKSPACE.height-120, center.y-40)))
   };
   state.nodes.push(node);
   state.selectedNodeId = node.id;
+  state.selectedNodeIds = [node.id];
   state.selectedEdgeId = null;
   renderAll();
   scheduleSave();
@@ -434,10 +440,43 @@ function renderAll(){
   renderProperties();
 }
 
+function getSelectedNodes(){
+  const ids=new Set(state.selectedNodeIds||[]);
+  return state.nodes.filter(n=>ids.has(n.id));
+}
+
+function isNodeSelected(id){
+  return (state.selectedNodeIds||[]).includes(id);
+}
+
+function setSingleNodeSelection(id){
+  state.selectedNodeId=id;
+  state.selectedNodeIds=id==null?[]:[id];
+  state.selectedEdgeId=null;
+}
+
+function clearNodeSelection(){
+  state.selectedNodeId=null;
+  state.selectedNodeIds=[];
+}
+
+function toggleNodeSelection(id){
+  const ids=[...(state.selectedNodeIds||[])];
+  const i=ids.indexOf(id);
+  if(i>=0) ids.splice(i,1);
+  else ids.push(id);
+  state.selectedNodeIds=ids;
+  state.selectedNodeId=ids.includes(id)?id:(ids[ids.length-1]??null);
+  state.selectedEdgeId=null;
+}
+
 function syncNodeSelectionStyles(){
   nodesLayer.querySelectorAll('.node').forEach(el=>{
     const id = Number(el.dataset.id);
-    el.classList.toggle('selected', state.selectedNodeId === id);
+    el.classList.toggle('selected', isNodeSelected(id));
+    el.classList.toggle('selected-primary', state.selectedNodeId === id);
+    const node=state.nodes.find(n=>n.id===id);
+    el.classList.toggle('locked', !!node?.locked);
     el.classList.toggle('connect-source', state.connectSourceId === id);
   });
 }
@@ -448,7 +487,9 @@ function renderNodes(){
     const s = cardSize(node);
     const el = document.createElement('div');
     el.className = 'node size-' + node.size +
-      (state.selectedNodeId === node.id ? ' selected' : '') +
+      (isNodeSelected(node.id) ? ' selected' : '') +
+      (state.selectedNodeId === node.id ? ' selected-primary' : '') +
+      (node.locked ? ' locked' : '') +
       (state.connectSourceId === node.id ? ' connect-source' : '');
     el.dataset.id = node.id;
     el.style.left = `${node.x}px`;
@@ -465,6 +506,7 @@ function renderNodes(){
         </div>
       </div>
       <div class="node-note">${escapeHtml(node.note)}</div>
+      ${node.locked?'<div class="lock-badge" title="固定中">LOCK</div>':''}
     `;
     bindNodeDrag(el,node);
     nodesLayer.appendChild(el);
@@ -483,34 +525,64 @@ function bindNodeDrag(el,node){
     if(e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
-    state.selectedNodeId = node.id;
-    state.selectedEdgeId = null;
+
+    if(e.shiftKey){
+      toggleNodeSelection(node.id);
+      syncNodeSelectionStyles();
+      renderProperties();
+      return;
+    }
+
+    if(!isNodeSelected(node.id)){
+      setSingleNodeSelection(node.id);
+    }else{
+      state.selectedNodeId=node.id;
+      state.selectedEdgeId=null;
+    }
     syncNodeSelectionStyles();
     renderProperties();
 
-    drag = {id:e.pointerId,sx:e.clientX,sy:e.clientY,ox:node.x,oy:node.y,moved:false,before:contentSnapshot()};
+    if(node.locked) return;
+
+    const movable=getSelectedNodes().filter(n=>!n.locked);
+    const positions=movable.map(n=>({id:n.id,x:n.x,y:n.y}));
+    drag={
+      id:e.pointerId,
+      sx:e.clientX,sy:e.clientY,
+      moved:false,
+      before:contentSnapshot(),
+      positions
+    };
     el.setPointerCapture(e.pointerId);
   });
 
   el.addEventListener('pointermove', e=>{
     if(!drag || drag.id !== e.pointerId) return;
-    const dx = (e.clientX-drag.sx)/state.view.scale;
-    const dy = (e.clientY-drag.sy)/state.view.scale;
-    if(Math.abs(dx)+Math.abs(dy)>3) drag.moved = true;
-    const s = cardSize(node);
-    node.x = Math.max(0,Math.min(WORKSPACE.width-s.w,snap(drag.ox+dx)));
-    node.y = Math.max(0,Math.min(WORKSPACE.height-s.h,snap(drag.oy+dy)));
-    el.style.left = `${node.x}px`;
-    el.style.top = `${node.y}px`;
+    const dx=(e.clientX-drag.sx)/state.view.scale;
+    const dy=(e.clientY-drag.sy)/state.view.scale;
+    if(Math.abs(dx)+Math.abs(dy)>3) drag.moved=true;
+
+    drag.positions.forEach(pos=>{
+      const target=state.nodes.find(n=>n.id===pos.id);
+      if(!target)return;
+      const s=cardSize(target);
+      target.x=Math.max(0,Math.min(WORKSPACE.width-s.w,snap(pos.x+dx)));
+      target.y=Math.max(0,Math.min(WORKSPACE.height-s.h,snap(pos.y+dy)));
+      const targetEl=nodesLayer.querySelector(`[data-id="${target.id}"]`);
+      if(targetEl){
+        targetEl.style.left=`${target.x}px`;
+        targetEl.style.top=`${target.y}px`;
+      }
+    });
     renderEdges();
   });
 
   el.addEventListener('pointerup', e=>{
     if(!drag || drag.id !== e.pointerId) return;
     if(el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
-    const changed = drag.moved;
+    const changed=drag.moved;
     const before=drag.before;
-    drag = null;
+    drag=null;
     if(changed){pushUndoSnapshot(before);scheduleSave();}
   });
 }
@@ -533,6 +605,7 @@ function handleConnectNode(nodeId){
     to:nodeId,
     type:'USB-C',
     label:'USB-C',
+    labelPos:.5,
     style:'curve',
     bend:.5,
     fromSide:'auto',
@@ -540,7 +613,7 @@ function handleConnectNode(nodeId){
   };
   state.edges.push(edge);
   state.selectedEdgeId = edge.id;
-  state.selectedNodeId = null;
+  clearNodeSelection();
   state.connectMode = false;
   state.connectSourceId = null;
   connectBtn.classList.remove('primary');
@@ -570,6 +643,66 @@ function anchor(node,side){
   return {x:c.x,y:node.y+s.h};
 }
 
+function pointAlongPolyline(points,t){
+  const lengths=[];
+  let total=0;
+  for(let i=0;i<points.length-1;i++){
+    const len=Math.hypot(points[i+1].x-points[i].x,points[i+1].y-points[i].y);
+    lengths.push(len);total+=len;
+  }
+  if(total<=0)return points[0];
+  let target=Math.max(0,Math.min(1,t))*total;
+  for(let i=0;i<lengths.length;i++){
+    if(target<=lengths[i]){
+      const r=lengths[i]?target/lengths[i]:0;
+      return {
+        x:points[i].x+(points[i+1].x-points[i].x)*r,
+        y:points[i].y+(points[i+1].y-points[i].y)*r
+      };
+    }
+    target-=lengths[i];
+  }
+  return points[points.length-1];
+}
+
+function edgeLabelPoint(edge){
+  const a=state.nodes.find(n=>n.id===edge.from);
+  const b=state.nodes.find(n=>n.id===edge.to);
+  if(!a||!b)return{x:0,y:0};
+  const fromSide=edge.fromSide==='auto'?autoSide(a,b):edge.fromSide;
+  const toSide=edge.toSide==='auto'?autoSide(b,a):edge.toSide;
+  const p1=anchor(a,fromSide),p2=anchor(b,toSide);
+  const t=Math.max(.08,Math.min(.92,Number.isFinite(+edge.labelPos)?+edge.labelPos:.5));
+
+  if(edge.style==='straight'){
+    return{x:p1.x+(p2.x-p1.x)*t,y:p1.y+(p2.y-p1.y)*t};
+  }
+
+  if(edge.style==='curve'){
+    const dx=Math.max(50,Math.abs(p2.x-p1.x)*.45);
+    const sign=p2.x>=p1.x?1:-1;
+    const c1={x:p1.x+dx*sign,y:p1.y};
+    const c2={x:p2.x-dx*sign,y:p2.y};
+    const u=1-t;
+    return{
+      x:u*u*u*p1.x+3*u*u*t*c1.x+3*u*t*t*c2.x+t*t*t*p2.x,
+      y:u*u*u*p1.y+3*u*u*t*c1.y+3*u*t*t*c2.y+t*t*t*p2.y
+    };
+  }
+
+  const horizontal=fromSide==='left'||fromSide==='right';
+  const bend=Math.max(.15,Math.min(.85,+edge.bend||.5));
+  let points;
+  if(horizontal){
+    const mx=Math.round((p1.x+(p2.x-p1.x)*bend)/GRID)*GRID;
+    points=[p1,{x:mx,y:p1.y},{x:mx,y:p2.y},p2];
+  }else{
+    const my=Math.round((p1.y+(p2.y-p1.y)*bend)/GRID)*GRID;
+    points=[p1,{x:p1.x,y:my},{x:p2.x,y:my},p2];
+  }
+  return pointAlongPolyline(points,t);
+}
+
 function edgeGeometry(edge){
   const a=state.nodes.find(n=>n.id===edge.from);
   const b=state.nodes.find(n=>n.id===edge.to);
@@ -578,9 +711,10 @@ function edgeGeometry(edge){
   const fromSide=edge.fromSide==='auto'?autoSide(a,b):edge.fromSide;
   const toSide=edge.toSide==='auto'?autoSide(b,a):edge.toSide;
   const p1=anchor(a,fromSide), p2=anchor(b,toSide);
+  const lp=edgeLabelPoint(edge);
 
   if(edge.style==='straight'){
-    return {d:`M ${p1.x} ${p1.y} L ${p2.x} ${p2.y}`,label:{x:(p1.x+p2.x)/2,y:(p1.y+p2.y)/2-8}};
+    return {d:`M ${p1.x} ${p1.y} L ${p2.x} ${p2.y}`,label:{x:lp.x,y:lp.y-9}};
   }
 
   if(edge.style==='curve'){
@@ -588,7 +722,7 @@ function edgeGeometry(edge){
     const sign=p2.x>=p1.x?1:-1;
     return {
       d:`M ${p1.x} ${p1.y} C ${p1.x+dx*sign} ${p1.y}, ${p2.x-dx*sign} ${p2.y}, ${p2.x} ${p2.y}`,
-      label:{x:(p1.x+p2.x)/2,y:(p1.y+p2.y)/2-9}
+      label:{x:lp.x,y:lp.y-9}
     };
   }
 
@@ -598,13 +732,13 @@ function edgeGeometry(edge){
     const mx=Math.round((p1.x+(p2.x-p1.x)*bend)/GRID)*GRID;
     return {
       d:`M ${p1.x} ${p1.y} L ${mx} ${p1.y} L ${mx} ${p2.y} L ${p2.x} ${p2.y}`,
-      label:{x:mx,y:(p1.y+p2.y)/2-8}
+      label:{x:lp.x,y:lp.y-9}
     };
   }
   const my=Math.round((p1.y+(p2.y-p1.y)*bend)/GRID)*GRID;
   return {
     d:`M ${p1.x} ${p1.y} L ${p1.x} ${my} L ${p2.x} ${my} L ${p2.x} ${p2.y}`,
-    label:{x:(p1.x+p2.x)/2,y:my-8}
+    label:{x:lp.x,y:lp.y-9}
   };
 }
 
@@ -622,7 +756,7 @@ function renderEdges(){
     hit.addEventListener('click', e=>{
       e.stopPropagation();
       state.selectedEdgeId=edge.id;
-      state.selectedNodeId=null;
+      clearNodeSelection();
       renderAll();
     });
     linksLayer.appendChild(hit);
@@ -644,7 +778,7 @@ function renderEdges(){
     text.addEventListener('click',e=>{
       e.stopPropagation();
       state.selectedEdgeId=edge.id;
-      state.selectedNodeId=null;
+      clearNodeSelection();
       renderAll();
     });
     linksLayer.appendChild(text);
@@ -680,6 +814,87 @@ function cableOptionGroups(current){
   `).join('');
 }
 
+function duplicateSelected(){
+  const originals=getSelectedNodes();
+  if(!originals.length)return;
+  pushUndoSnapshot();
+
+  const idMap=new Map();
+  const clones=originals.map(node=>{
+    const id=state.nextId++;
+    idMap.set(node.id,id);
+    const s=cardSize(node);
+    return{
+      ...node,
+      id,
+      x:Math.min(WORKSPACE.width-s.w,node.x+40),
+      y:Math.min(WORKSPACE.height-s.h,node.y+40),
+      locked:false
+    };
+  });
+
+  const selectedSet=new Set(originals.map(n=>n.id));
+  const edgeClones=state.edges
+    .filter(e=>selectedSet.has(e.from)&&selectedSet.has(e.to))
+    .map(e=>({
+      ...e,
+      id:`e${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
+      from:idMap.get(e.from),
+      to:idMap.get(e.to)
+    }));
+
+  state.nodes.push(...clones);
+  state.edges.push(...edgeClones);
+  state.selectedNodeIds=clones.map(n=>n.id);
+  state.selectedNodeId=clones[clones.length-1]?.id??null;
+  state.selectedEdgeId=null;
+  renderAll();scheduleSave();
+  showToast(`${clones.length}台を複製しました`);
+}
+
+function setSelectedLocked(locked){
+  const selected=getSelectedNodes();
+  if(!selected.length)return;
+  pushUndoSnapshot();
+  selected.forEach(n=>n.locked=locked);
+  renderAll();scheduleSave();
+  showToast(locked?'固定しました':'固定を解除しました');
+}
+
+function alignSelected(mode){
+  const nodes=getSelectedNodes().filter(n=>!n.locked);
+  if(nodes.length<2){showToast('整列するには固定されていない機器を2台以上選択してください');return;}
+  if((mode==='hspace'||mode==='vspace')&&nodes.length<3){showToast('等間隔には3台以上選択してください');return;}
+
+  pushUndoSnapshot();
+
+  if(mode==='left'){
+    const x=Math.min(...nodes.map(n=>n.x));
+    nodes.forEach(n=>n.x=snap(x));
+  }else if(mode==='top'){
+    const y=Math.min(...nodes.map(n=>n.y));
+    nodes.forEach(n=>n.y=snap(y));
+  }else if(mode==='hspace'){
+    const sorted=[...nodes].sort((a,b)=>a.x-b.x);
+    const left=Math.min(...sorted.map(n=>n.x));
+    const right=Math.max(...sorted.map(n=>n.x+cardSize(n).w));
+    const widths=sorted.reduce((sum,n)=>sum+cardSize(n).w,0);
+    const gap=(right-left-widths)/(sorted.length-1);
+    let x=left;
+    sorted.forEach(n=>{n.x=snap(x);x+=cardSize(n).w+gap;});
+  }else if(mode==='vspace'){
+    const sorted=[...nodes].sort((a,b)=>a.y-b.y);
+    const top=Math.min(...sorted.map(n=>n.y));
+    const bottom=Math.max(...sorted.map(n=>n.y+cardSize(n).h));
+    const heights=sorted.reduce((sum,n)=>sum+cardSize(n).h,0);
+    const gap=(bottom-top-heights)/(sorted.length-1);
+    let y=top;
+    sorted.forEach(n=>{n.y=snap(y);y+=cardSize(n).h+gap;});
+  }
+
+  renderAll();scheduleSave();
+}
+
 function renderProperties(){
   const edge=state.edges.find(e=>e.id===state.selectedEdgeId);
   if(edge){
@@ -694,6 +909,9 @@ function renderProperties(){
         <select class="form-control" id="edgeType">${cableOptionGroups(edge.type)}</select>
         <label class="form-label">表示ラベル</label>
         <input class="form-control" id="edgeLabel" value="${escapeHtml(edge.label)}">
+        <label class="form-label">ラベル位置</label>
+        <input class="form-control" id="edgeLabelPos" type="range" min="8" max="92" value="${Math.round((edge.labelPos??.5)*100)}">
+        <div class="range-caption"><span>接続元</span><span id="labelPosValue">${Math.round((edge.labelPos??.5)*100)}%</span><span>接続先</span></div>
         <label class="form-label">線の形</label>
         <select class="form-control" id="edgeStyle">
           ${optionList(['curve','orthogonal','straight'],edge.style,{curve:'カーブ',orthogonal:'直角',straight:'直線'})}
@@ -725,6 +943,17 @@ function renderProperties(){
     });
     bindTrackedText(labelEl,()=>{edge.label=labelEl.value;renderEdges();scheduleSave()});
 
+    const labelPosEl=document.getElementById('edgeLabelPos');
+    labelPosEl.addEventListener('focus',()=>beginTrackedEdit(labelPosEl));
+    labelPosEl.addEventListener('pointerdown',()=>beginTrackedEdit(labelPosEl));
+    labelPosEl.addEventListener('input',e=>{
+      edge.labelPos=+e.target.value/100;
+      document.getElementById('labelPosValue').textContent=`${e.target.value}%`;
+      renderEdges();scheduleSave();
+    });
+    labelPosEl.addEventListener('change',()=>endTrackedEdit(labelPosEl));
+    labelPosEl.addEventListener('blur',()=>endTrackedEdit(labelPosEl));
+
     document.getElementById('edgeStyle').addEventListener('change',e=>{
       pushUndoSnapshot();edge.style=e.target.value;renderEdges();scheduleSave();
     });
@@ -746,7 +975,48 @@ function renderProperties(){
     return;
   }
 
-  const node=state.nodes.find(n=>n.id===state.selectedNodeId);
+  const selected=getSelectedNodes();
+  if(selected.length>1){
+    const lockedCount=selected.filter(n=>n.locked).length;
+    properties.className='';
+    properties.innerHTML=`
+      <div class="form-section">
+        <h3>複数選択</h3>
+        <div class="selection-summary"><strong>${selected.length}台</strong>を選択中</div>
+        <div class="mini-text">Shift+クリックで選択を追加・解除できます。</div>
+      </div>
+      <div class="form-section">
+        <h3>操作</h3>
+        <div class="action-grid">
+          <button class="btn" id="duplicateSelectedBtn">複製</button>
+          <button class="btn" id="lockSelectedBtn">固定</button>
+          <button class="btn" id="unlockSelectedBtn">固定解除</button>
+          <button class="btn danger" id="deleteSelectedBtn">削除</button>
+        </div>
+        <div class="mini-text" style="margin-top:8px">${lockedCount?`${lockedCount}台が固定中。固定済みカードはドラッグ・整列では動きません。`:'固定すると誤ドラッグを防げます。'}</div>
+      </div>
+      <div class="form-section">
+        <h3>整列</h3>
+        <div class="action-grid">
+          <button class="btn" id="alignLeftBtn">左揃え</button>
+          <button class="btn" id="alignTopBtn">上揃え</button>
+          <button class="btn" id="spaceHBtn">横等間隔</button>
+          <button class="btn" id="spaceVBtn">縦等間隔</button>
+        </div>
+      </div>
+    `;
+    document.getElementById('duplicateSelectedBtn').onclick=duplicateSelected;
+    document.getElementById('lockSelectedBtn').onclick=()=>setSelectedLocked(true);
+    document.getElementById('unlockSelectedBtn').onclick=()=>setSelectedLocked(false);
+    document.getElementById('deleteSelectedBtn').onclick=deleteSelection;
+    document.getElementById('alignLeftBtn').onclick=()=>alignSelected('left');
+    document.getElementById('alignTopBtn').onclick=()=>alignSelected('top');
+    document.getElementById('spaceHBtn').onclick=()=>alignSelected('hspace');
+    document.getElementById('spaceVBtn').onclick=()=>alignSelected('vspace');
+    return;
+  }
+
+  const node=selected[0] || state.nodes.find(n=>n.id===state.selectedNodeId);
   if(!node){
     properties.className='properties-empty';
     properties.textContent='機器またはケーブルを選択してください。';
@@ -769,7 +1039,11 @@ function renderProperties(){
       <label class="form-label">メモ</label>
       <textarea class="form-control" id="nodeNote" rows="2">${escapeHtml(node.note)}</textarea>
     </div>
-    <button class="btn danger" id="deleteNodeBtn" style="width:100%">機器削除</button>
+    <div class="action-grid single-actions">
+      <button class="btn" id="duplicateNodeBtn">複製</button>
+      <button class="btn" id="lockNodeBtn">${node.locked?'固定解除':'固定'}</button>
+    </div>
+    <button class="btn danger" id="deleteNodeBtn" style="width:100%;margin-top:8px">機器削除</button>
   `;
 
   bindTrackedText(document.getElementById('nodeName'),e=>{node.name=e.target.value;updateNodeVisual(node)});
@@ -784,6 +1058,8 @@ function renderProperties(){
     const type=DEVICE_TYPES.find(d=>d.type===e.target.value);
     node.type=type.type;node.iconKey=type.iconKey;updateNodeVisual(node);
   });
+  document.getElementById('duplicateNodeBtn').onclick=duplicateSelected;
+  document.getElementById('lockNodeBtn').onclick=()=>setSelectedLocked(!node.locked);
   document.getElementById('deleteNodeBtn').addEventListener('click',deleteSelection);
 }
 
@@ -795,13 +1071,15 @@ function deleteSelection(){
     renderAll();scheduleSave();showToast('ケーブルを削除しました');
     return;
   }
-  if(state.selectedNodeId){
+
+  const ids=new Set(state.selectedNodeIds||[]);
+  if(ids.size){
     pushUndoSnapshot();
-    const id=state.selectedNodeId;
-    state.nodes=state.nodes.filter(n=>n.id!==id);
-    state.edges=state.edges.filter(e=>e.from!==id&&e.to!==id);
-    state.selectedNodeId=null;
-    renderAll();scheduleSave();showToast('機器を削除しました');
+    state.nodes=state.nodes.filter(n=>!ids.has(n.id));
+    state.edges=state.edges.filter(e=>!ids.has(e.from)&&!ids.has(e.to));
+    clearNodeSelection();
+    renderAll();scheduleSave();
+    showToast(`${ids.size}台を削除しました`);
   }
 }
 
@@ -957,7 +1235,11 @@ viewport.addEventListener('pointerup',e=>{
   const edge=nearestEdgeAt(p.x,p.y,16/state.view.scale);
   if(edge){
     state.selectedEdgeId=edge.id;
-    state.selectedNodeId=null;
+    clearNodeSelection();
+    renderAll();
+  }else{
+    state.selectedEdgeId=null;
+    clearNodeSelection();
     renderAll();
   }
 });
@@ -982,6 +1264,7 @@ window.addEventListener('keydown',e=>{
   const mod=e.ctrlKey||e.metaKey;
   if(mod && !e.shiftKey && e.key.toLowerCase()==='z'){e.preventDefault();undo()}
   else if((mod && e.key.toLowerCase()==='y') || (mod && e.shiftKey && e.key.toLowerCase()==='z')){e.preventDefault();redo()}
+  else if(mod&&e.key.toLowerCase()==='d'){e.preventDefault();duplicateSelected()}
   else if(mod&&e.key==='0'){e.preventDefault();zoomAtCenter(1)}
   else if(e.key==='Delete'){e.preventDefault();deleteSelection()}
   else if(e.key==='+'||e.key==='='){e.preventDefault();zoomAtCenter(state.view.scale*1.2)}
@@ -1047,12 +1330,14 @@ function showHelpModal(isFirst=false){
     <div class="welcome-grid">
       <div class="welcome-card"><strong>① 機器を追加</strong><p>左のデバイス一覧から追加し、カード全体をドラッグして配置します。</p></div>
       <div class="welcome-card"><strong>② ケーブルを接続</strong><p>「機器を接続」を押し、接続する2台を順番にクリックします。</p></div>
-      <div class="welcome-card"><strong>③ 詳細を編集</strong><p>機器やケーブルを選択すると、右側で型番・メモ・種類・接続方向などを編集できます。</p></div>
+      <div class="welcome-card"><strong>③ 詳細を編集</strong><p>機器やケーブルを選択すると、右側で型番・メモ・固定・ラベル位置などを編集できます。</p></div>
       <div class="welcome-card"><strong>④ 保存・出力</strong><p>作業はブラウザ内に自動保存。JSONでバックアップし、PNG画像にも書き出せます。</p></div>
     </div>
     <div class="shortcut-list">
       <kbd>Ctrl + Z</kbd><span>元に戻す</span>
       <kbd>Ctrl + Y</kbd><span>やり直す</span>
+      <kbd>Shift + クリック</kbd><span>機器を複数選択</span>
+      <kbd>Ctrl + D</kbd><span>選択中の機器を複製</span>
       <kbd>Delete</kbd><span>選択中の機器・ケーブルを削除</span>
       <kbd>Ctrl + 0</kbd><span>表示倍率を100%へ</span>
       <kbd>Home</kbd><span>全体表示</span>
@@ -1184,23 +1469,23 @@ function drawEdgeCanvas(ctx,edge,offsetX,offsetY){
   ctx.beginPath();ctx.moveTo(x1,y1);
   if(edge.style==='straight'){
     ctx.lineTo(x2,y2);
-    return{x:(x1+x2)/2,y:(y1+y2)/2-9};
-  }
-  if(edge.style==='curve'){
+  }else if(edge.style==='curve'){
     const dx=Math.max(50,Math.abs(x2-x1)*.45),sign=x2>=x1?1:-1;
     ctx.bezierCurveTo(x1+dx*sign,y1,x2-dx*sign,y2,x2,y2);
-    return{x:(x1+x2)/2,y:(y1+y2)/2-9};
+  }else{
+    const horizontal=fs==='left'||fs==='right';
+    const bend=Math.max(.15,Math.min(.85,+edge.bend||.5));
+    if(horizontal){
+      const mx=Math.round((p1.x+(p2.x-p1.x)*bend)/GRID)*GRID-offsetX;
+      ctx.lineTo(mx,y1);ctx.lineTo(mx,y2);ctx.lineTo(x2,y2);
+    }else{
+      const my=Math.round((p1.y+(p2.y-p1.y)*bend)/GRID)*GRID-offsetY;
+      ctx.lineTo(x1,my);ctx.lineTo(x2,my);ctx.lineTo(x2,y2);
+    }
   }
-  const horizontal=fs==='left'||fs==='right';
-  const bend=Math.max(.15,Math.min(.85,+edge.bend||.5));
-  if(horizontal){
-    const mx=Math.round((p1.x+(p2.x-p1.x)*bend)/GRID)*GRID-offsetX;
-    ctx.lineTo(mx,y1);ctx.lineTo(mx,y2);ctx.lineTo(x2,y2);
-    return{x:mx,y:(y1+y2)/2-8};
-  }
-  const my=Math.round((p1.y+(p2.y-p1.y)*bend)/GRID)*GRID-offsetY;
-  ctx.lineTo(x1,my);ctx.lineTo(x2,my);ctx.lineTo(x2,y2);
-  return{x:(x1+x2)/2,y:my-8};
+
+  const lp=edgeLabelPoint(edge);
+  return{x:lp.x-offsetX,y:lp.y-offsetY-9};
 }
 
 pngBtn.addEventListener('click',async()=>{

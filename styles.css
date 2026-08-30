@@ -224,3 +224,18 @@ textarea.form-control{resize:vertical;min-height:62px;line-height:1.4}
   line-height:1.45;
   -webkit-line-clamp:6;
 }
+
+.node.selected{border-color:#6ea8fe}
+.node.selected-primary{box-shadow:0 0 0 2px rgba(110,168,254,.22),0 10px 25px rgba(0,0,0,.3)}
+.node.locked{border-style:dashed}
+.lock-badge{
+  position:absolute;right:8px;bottom:7px;
+  padding:2px 5px;border-radius:5px;
+  background:#131925;border:1px solid #3d4a60;
+  color:#8ea1bb;font-size:7px;font-weight:800;letter-spacing:.08em;
+  pointer-events:none;
+}
+.action-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.single-actions{margin-bottom:0}
+.selection-summary{font-size:13px;margin-bottom:5px;color:#dce6f4}
+.range-caption{display:flex;justify-content:space-between;margin-top:3px;font-size:9px;color:#718097}
