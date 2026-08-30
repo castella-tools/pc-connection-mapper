@@ -17,7 +17,7 @@
       <div class="brand">
         <span class="brand-mark">⌘</span>
         <span>PC Connection Mapper</span>
-        <span class="version">v1.0</span>
+        <span class="version">v1.1</span>
       </div>
 
       <div class="save-status" id="saveStatus">自動保存</div>
@@ -25,12 +25,16 @@
       <div class="top-actions">
         <button class="btn ghost" id="toggleLeftBtn">デバイス</button>
         <button class="btn ghost" id="toggleRightBtn">プロパティ</button>
-        <button class="btn" id="newBtn">新規</button>
+        <button class="btn icon-action" id="undoBtn" title="元に戻す (Ctrl+Z)" disabled>↶</button>
+        <button class="btn icon-action" id="redoBtn" title="やり直す (Ctrl+Y / Ctrl+Shift+Z)" disabled>↷</button>
+        <button class="btn" id="newBtn">新規作成</button>
+        <button class="btn" id="sampleBtn">サンプル</button>
         <button class="btn" id="connectBtn">機器を接続</button>
         <button class="btn" id="jsonSaveBtn">JSON保存</button>
         <button class="btn" id="jsonLoadBtn">JSON読込</button>
         <input id="jsonFileInput" type="file" accept=".json,application/json" hidden>
         <button class="btn primary" id="pngBtn">PNG出力</button>
+        <button class="btn ghost help-btn" id="helpBtn" title="使い方">?</button>
       </div>
     </header>
 

@@ -2,6 +2,8 @@
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
 const STORAGE_KEY = 'pc-connection-mapper-v1';
+const INTRO_KEY = 'pc-connection-mapper-intro-seen-v1';
+const HISTORY_LIMIT = 50;
 
 const DEVICE_TYPES = [
   ['PC','🖥️','large'],['Laptop','💻','medium'],['Monitor','🖵','medium'],
@@ -45,6 +47,10 @@ const jsonLoadBtn = document.getElementById('jsonLoadBtn');
 const jsonFileInput = document.getElementById('jsonFileInput');
 const pngBtn = document.getElementById('pngBtn');
 const newBtn = document.getElementById('newBtn');
+const sampleBtn = document.getElementById('sampleBtn');
+const undoBtn = document.getElementById('undoBtn');
+const redoBtn = document.getElementById('redoBtn');
+const helpBtn = document.getElementById('helpBtn');
 const toggleLeftBtn = document.getElementById('toggleLeftBtn');
 const toggleRightBtn = document.getElementById('toggleRightBtn');
 
@@ -77,6 +83,72 @@ let state = {
 let saveTimer = null;
 let toastTimer = null;
 let panState = null;
+let firstRun = false;
+const history = {undo:[],redo:[]};
+const editSnapshots = new WeakMap();
+
+
+function contentSnapshot(){
+  return JSON.stringify({nodes:state.nodes,edges:state.edges,nextId:state.nextId});
+}
+
+function pushUndoSnapshot(snapshot=contentSnapshot()){
+  if(!snapshot) return;
+  if(history.undo.at(-1)!==snapshot) history.undo.push(snapshot);
+  if(history.undo.length>HISTORY_LIMIT) history.undo.shift();
+  history.redo=[];
+  updateHistoryButtons();
+}
+
+function updateHistoryButtons(){
+  undoBtn.disabled=history.undo.length===0;
+  redoBtn.disabled=history.redo.length===0;
+}
+
+function restoreContentSnapshot(snapshot){
+  const data=JSON.parse(snapshot);
+  state.nodes=data.nodes||[];
+  state.edges=data.edges||[];
+  state.nextId=data.nextId||Math.max(0,...state.nodes.map(n=>Number(n.id)||0))+1;
+  state.selectedNodeId=null;state.selectedEdgeId=null;state.connectMode=false;state.connectSourceId=null;
+  connectBtn.classList.remove('primary');connectBtn.textContent='機器を接続';
+  renderAll();scheduleSave();
+}
+
+function undo(){
+  if(!history.undo.length)return;
+  history.redo.push(contentSnapshot());
+  restoreContentSnapshot(history.undo.pop());
+  updateHistoryButtons();
+  showToast('元に戻しました');
+}
+
+function redo(){
+  if(!history.redo.length)return;
+  history.undo.push(contentSnapshot());
+  restoreContentSnapshot(history.redo.pop());
+  updateHistoryButtons();
+  showToast('やり直しました');
+}
+
+function beginTrackedEdit(el){
+  if(!editSnapshots.has(el)) editSnapshots.set(el,contentSnapshot());
+}
+function endTrackedEdit(el){
+  const before=editSnapshots.get(el);
+  if(before && before!==contentSnapshot()) pushUndoSnapshot(before);
+  editSnapshots.delete(el);
+}
+function bindTrackedText(el,onInput){
+  el.addEventListener('focus',()=>beginTrackedEdit(el));
+  el.addEventListener('input',onInput);
+  el.addEventListener('change',()=>endTrackedEdit(el));
+  el.addEventListener('blur',()=>endTrackedEdit(el));
+}
+
+function makeBlank(){
+  return {version:'1.1',nextId:1,nodes:[],edges:[],view:{x:0,y:0,scale:1}};
+}
 
 function escapeHtml(value){
   return String(value ?? '').replace(/[&<>"']/g, ch => ({
@@ -111,7 +183,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.0',
+    version:'1.1',
     nodes:state.nodes,
     edges:state.edges,
     view:state.view,
@@ -121,7 +193,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.0',
+    version:'1.1',
     nextId:7,
     nodes:[
       {id:1,type:'PC',icon:'🖥️',size:'large',name:'Main PC',model:'Custom Build',note:'Gaming / Workstation',x:1500,y:1050},
@@ -150,6 +222,7 @@ function loadInitialState(){
       return;
     }
   }catch(err){ console.warn(err); }
+  firstRun = true;
   applyImportedState(makeSample(), false);
   requestAnimationFrame(centerWorkspace);
 }
@@ -196,6 +269,7 @@ function buildPalette(){
 }
 
 function addNode(device){
+  pushUndoSnapshot();
   const center = screenToWorld(viewport.clientWidth/2 + viewport.getBoundingClientRect().left,
                                viewport.clientHeight/2 + viewport.getBoundingClientRect().top);
   const node = {
@@ -268,7 +342,7 @@ function bindNodeDrag(el,node){
     renderProperties();
     el.classList.add('selected');
 
-    drag = {id:e.pointerId,sx:e.clientX,sy:e.clientY,ox:node.x,oy:node.y,moved:false};
+    drag = {id:e.pointerId,sx:e.clientX,sy:e.clientY,ox:node.x,oy:node.y,moved:false,before:contentSnapshot()};
     el.setPointerCapture(e.pointerId);
   });
 
@@ -289,8 +363,9 @@ function bindNodeDrag(el,node){
     if(!drag || drag.id !== e.pointerId) return;
     if(el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
     const changed = drag.moved;
+    const before=drag.before;
     drag = null;
-    if(changed) scheduleSave();
+    if(changed){pushUndoSnapshot(before);scheduleSave();}
   });
 }
 
@@ -305,6 +380,7 @@ function handleConnectNode(nodeId){
     renderNodes();
     return;
   }
+  pushUndoSnapshot();
   const edge = {
     id:`e${Date.now()}_${Math.random().toString(36).slice(2,6)}`,
     from:state.connectSourceId,
@@ -451,6 +527,7 @@ function optionList(values,current,labels=null){
 function renderProperties(){
   const edge=state.edges.find(e=>e.id===state.selectedEdgeId);
   if(edge){
+    properties.className='';
     const a=state.nodes.find(n=>n.id===edge.from);
     const b=state.nodes.find(n=>n.id===edge.to);
     properties.innerHTML=`
@@ -484,20 +561,32 @@ function renderProperties(){
     const typeEl=document.getElementById('edgeType');
     const labelEl=document.getElementById('edgeLabel');
     typeEl.addEventListener('change',()=>{
+      pushUndoSnapshot();
       edge.type=typeEl.value;
       edge.label=edge.type;
       labelEl.value=edge.label;
       renderEdges();scheduleSave();
     });
-    labelEl.addEventListener('input',()=>{edge.label=labelEl.value;renderEdges();scheduleSave()});
-    document.getElementById('edgeStyle').addEventListener('change',e=>{edge.style=e.target.value;renderEdges();scheduleSave()});
-    document.getElementById('edgeBend').addEventListener('input',e=>{edge.bend=+e.target.value/100;renderEdges();scheduleSave()});
-    document.getElementById('fromSide').addEventListener('change',e=>{edge.fromSide=e.target.value;renderEdges();scheduleSave()});
-    document.getElementById('toSide').addEventListener('change',e=>{edge.toSide=e.target.value;renderEdges();scheduleSave()});
-    document.getElementById('deleteEdgeBtn').addEventListener('click',()=>{
-      state.edges=state.edges.filter(e=>e.id!==edge.id);
-      state.selectedEdgeId=null;renderAll();scheduleSave();
+    bindTrackedText(labelEl,()=>{edge.label=labelEl.value;renderEdges();scheduleSave()});
+
+    document.getElementById('edgeStyle').addEventListener('change',e=>{
+      pushUndoSnapshot();edge.style=e.target.value;renderEdges();scheduleSave();
     });
+
+    const bendEl=document.getElementById('edgeBend');
+    bendEl.addEventListener('focus',()=>beginTrackedEdit(bendEl));
+    bendEl.addEventListener('pointerdown',()=>beginTrackedEdit(bendEl));
+    bendEl.addEventListener('input',e=>{edge.bend=+e.target.value/100;renderEdges();scheduleSave()});
+    bendEl.addEventListener('change',()=>endTrackedEdit(bendEl));
+    bendEl.addEventListener('blur',()=>endTrackedEdit(bendEl));
+
+    document.getElementById('fromSide').addEventListener('change',e=>{
+      pushUndoSnapshot();edge.fromSide=e.target.value;renderEdges();scheduleSave();
+    });
+    document.getElementById('toSide').addEventListener('change',e=>{
+      pushUndoSnapshot();edge.toSide=e.target.value;renderEdges();scheduleSave();
+    });
+    document.getElementById('deleteEdgeBtn').addEventListener('click',deleteSelection);
     return;
   }
 
@@ -527,19 +616,37 @@ function renderProperties(){
     <button class="btn danger" id="deleteNodeBtn" style="width:100%">機器削除</button>
   `;
 
-  document.getElementById('nodeName').addEventListener('input',e=>{node.name=e.target.value;updateNodeVisual(node)});
-  document.getElementById('nodeModel').addEventListener('input',e=>{node.model=e.target.value;updateNodeVisual(node)});
-  document.getElementById('nodeNote').addEventListener('input',e=>{node.note=e.target.value;updateNodeVisual(node)});
-  document.getElementById('nodeSize').addEventListener('change',e=>{node.size=e.target.value;updateNodeVisual(node)});
+  bindTrackedText(document.getElementById('nodeName'),e=>{node.name=e.target.value;updateNodeVisual(node)});
+  bindTrackedText(document.getElementById('nodeModel'),e=>{node.model=e.target.value;updateNodeVisual(node)});
+  bindTrackedText(document.getElementById('nodeNote'),e=>{node.note=e.target.value;updateNodeVisual(node)});
+
+  document.getElementById('nodeSize').addEventListener('change',e=>{
+    pushUndoSnapshot();node.size=e.target.value;updateNodeVisual(node);
+  });
   document.getElementById('nodeType').addEventListener('change',e=>{
+    pushUndoSnapshot();
     const type=DEVICE_TYPES.find(d=>d.type===e.target.value);
     node.type=type.type;node.icon=type.icon;updateNodeVisual(node);
   });
-  document.getElementById('deleteNodeBtn').addEventListener('click',()=>{
-    state.nodes=state.nodes.filter(n=>n.id!==node.id);
-    state.edges=state.edges.filter(e=>e.from!==node.id&&e.to!==node.id);
-    state.selectedNodeId=null;renderAll();scheduleSave();
-  });
+  document.getElementById('deleteNodeBtn').addEventListener('click',deleteSelection);
+}
+
+function deleteSelection(){
+  if(state.selectedEdgeId){
+    pushUndoSnapshot();
+    state.edges=state.edges.filter(e=>e.id!==state.selectedEdgeId);
+    state.selectedEdgeId=null;
+    renderAll();scheduleSave();showToast('ケーブルを削除しました');
+    return;
+  }
+  if(state.selectedNodeId){
+    pushUndoSnapshot();
+    const id=state.selectedNodeId;
+    state.nodes=state.nodes.filter(n=>n.id!==id);
+    state.edges=state.edges.filter(e=>e.from!==id&&e.to!==id);
+    state.selectedNodeId=null;
+    renderAll();scheduleSave();showToast('機器を削除しました');
+  }
 }
 
 function sideOptions(current){
@@ -714,12 +821,20 @@ resetZoomBtn.addEventListener('click',()=>zoomAtCenter(1));
 fitBtn.addEventListener('click',fitAll);
 
 window.addEventListener('keydown',e=>{
+  if(exportModal.classList.contains('show'))return;
   if(['INPUT','TEXTAREA','SELECT'].includes(e.target?.tagName))return;
-  if((e.ctrlKey||e.metaKey)&&e.key==='0'){e.preventDefault();zoomAtCenter(1)}
+  const mod=e.ctrlKey||e.metaKey;
+  if(mod && !e.shiftKey && e.key.toLowerCase()==='z'){e.preventDefault();undo()}
+  else if((mod && e.key.toLowerCase()==='y') || (mod && e.shiftKey && e.key.toLowerCase()==='z')){e.preventDefault();redo()}
+  else if(mod&&e.key==='0'){e.preventDefault();zoomAtCenter(1)}
+  else if(e.key==='Delete'){e.preventDefault();deleteSelection()}
   else if(e.key==='+'||e.key==='='){e.preventDefault();zoomAtCenter(state.view.scale*1.2)}
   else if(e.key==='-'){e.preventDefault();zoomAtCenter(state.view.scale/1.2)}
   else if(e.key==='Home'){e.preventDefault();fitAll()}
 });
+
+undoBtn.addEventListener('click',undo);
+redoBtn.addEventListener('click',redo);
 
 connectBtn.addEventListener('click',()=>{
   state.connectMode=!state.connectMode;
@@ -741,7 +856,15 @@ toggleRightBtn.addEventListener('click',()=>{
 });
 
 newBtn.addEventListener('click',()=>{
-  if(!confirm('現在の構成をサンプル状態へ戻しますか？'))return;
+  if(!confirm('現在の構成を消して、空のキャンバスから新規作成しますか？'))return;
+  pushUndoSnapshot();
+  applyImportedState(makeBlank());
+  requestAnimationFrame(()=>{centerWorkspace();scheduleSave()});
+});
+
+sampleBtn.addEventListener('click',()=>{
+  if(!confirm('現在の構成をサンプル構成に置き換えますか？'))return;
+  pushUndoSnapshot();
   applyImportedState(makeSample());
   requestAnimationFrame(()=>{centerWorkspace();scheduleSave()});
 });
@@ -749,17 +872,58 @@ newBtn.addEventListener('click',()=>{
 function openModal(title,html){
   modalTitle.textContent=title;
   modalContent.innerHTML=html;
+  modalDownloadLink.style.display='inline-flex';
+  copyJsonBtn.hidden=true;
   exportModal.classList.add('show');
 }
 function closeModal(){
   exportModal.classList.remove('show');
   modalContent.innerHTML='';
+  modalDownloadLink.style.display='inline-flex';
   copyJsonBtn.hidden=true;
   copyJsonBtn.onclick=null;
 }
+
+function showHelpModal(isFirst=false){
+  if(isFirst) localStorage.setItem(INTRO_KEY,'1');
+  openModal(isFirst?'PC Connection Mapperへようこそ':'使い方',`
+    <p class="welcome-lead">PC・モニター・USB機器・オーディオ・ネットワーク機器などの接続関係を、カードとケーブルで視覚化できます。</p>
+    <div class="welcome-grid">
+      <div class="welcome-card"><strong>① 機器を追加</strong><p>左のデバイス一覧から追加し、カード全体をドラッグして配置します。</p></div>
+      <div class="welcome-card"><strong>② ケーブルを接続</strong><p>「機器を接続」を押し、接続する2台を順番にクリックします。</p></div>
+      <div class="welcome-card"><strong>③ 詳細を編集</strong><p>機器やケーブルを選択すると、右側で型番・メモ・種類・接続方向などを編集できます。</p></div>
+      <div class="welcome-card"><strong>④ 保存・出力</strong><p>作業はブラウザ内に自動保存。JSONでバックアップし、PNG画像にも書き出せます。</p></div>
+    </div>
+    <div class="shortcut-list">
+      <kbd>Ctrl + Z</kbd><span>元に戻す</span>
+      <kbd>Ctrl + Y</kbd><span>やり直す</span>
+      <kbd>Delete</kbd><span>選択中の機器・ケーブルを削除</span>
+      <kbd>Ctrl + 0</kbd><span>表示倍率を100%へ</span>
+      <kbd>Home</kbd><span>全体表示</span>
+    </div>
+    ${isFirst?`<div class="welcome-actions"><button class="btn primary" id="introBlankBtn">空の構成で始める</button><button class="btn" id="introSampleBtn">サンプルを見る</button></div>`:''}
+    <p class="mini-text" style="margin-top:14px">構成データはこのブラウザ内に保存され、GitHubへ送信されません。別端末へ移す場合はJSON保存を利用してください。</p>
+  `);
+  modalDownloadLink.style.display='none';
+  copyJsonBtn.hidden=true;
+  if(isFirst){
+    document.getElementById('introBlankBtn').addEventListener('click',()=>{
+      localStorage.setItem(INTRO_KEY,'1');
+      applyImportedState(makeBlank());
+      history.undo=[];history.redo=[];updateHistoryButtons();
+      closeModal();requestAnimationFrame(()=>{centerWorkspace();scheduleSave()});
+    });
+    document.getElementById('introSampleBtn').addEventListener('click',()=>{
+      localStorage.setItem(INTRO_KEY,'1');
+      closeModal();requestAnimationFrame(fitAll);
+    });
+  }
+}
+
 modalCloseBtn.addEventListener('click',closeModal);
 modalCloseBtn2.addEventListener('click',closeModal);
 exportModal.addEventListener('click',e=>{if(e.target===exportModal)closeModal()});
+helpBtn.addEventListener('click',()=>showHelpModal(false));
 
 async function saveBlob(blob,filename,mime){
   try{
@@ -813,6 +977,7 @@ jsonFileInput.addEventListener('change',async()=>{
   if(!file)return;
   try{
     const parsed=JSON.parse(await file.text());
+    pushUndoSnapshot();
     applyImportedState(parsed);
     showToast('JSONを読み込みました');
   }catch(err){
@@ -968,3 +1133,5 @@ window.addEventListener('resize',()=>applyView());
 buildPalette();
 loadInitialState();
 applyView();
+updateHistoryButtons();
+if(firstRun && !localStorage.getItem(INTRO_KEY)) requestAnimationFrame(()=>showHelpModal(true));
