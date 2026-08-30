@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.16 loaded');
+console.info('PC Connection Mapper app.js v1.17 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -108,7 +108,8 @@ function nodeIconKey(node){
 const CARD_SIZES = {
   small:{w:145,h:68},
   medium:{w:170,h:86},
-  large:{w:205,h:112}
+  large:{w:205,h:112},
+  xlarge:{w:285,h:180}
 };
 
 const CABLES = {
@@ -267,7 +268,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.16',nextId:1,nodes:[],edges:[],view:{x:0,y:0,scale:1}};
+  return {version:'1.17',nextId:1,nodes:[],edges:[],view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -303,7 +304,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.16',
+    version:'1.17',
     nodes:state.nodes,
     edges:state.edges,
     view:state.view,
@@ -313,7 +314,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.16',
+    version:'1.17',
     nextId:7,
     nodes:[
       {id:1,type:'PC',iconKey:'pc',size:'large',name:'Main PC',model:'Custom Build',note:'Gaming / Workstation',x:1500,y:1050},
@@ -446,7 +447,7 @@ function renderNodes(){
   state.nodes.forEach(node=>{
     const s = cardSize(node);
     const el = document.createElement('div');
-    el.className = 'node' +
+    el.className = 'node size-' + node.size +
       (state.selectedNodeId === node.id ? ' selected' : '') +
       (state.connectSourceId === node.id ? ' connect-source' : '');
     el.dataset.id = node.id;
@@ -654,6 +655,8 @@ function updateNodeVisual(node){
   const el=nodesLayer.querySelector(`[data-id="${node.id}"]`);
   if(!el) return;
   const s=cardSize(node);
+  el.classList.remove('size-small','size-medium','size-large','size-xlarge');
+  el.classList.add(`size-${node.size}`);
   el.style.width=`${s.w}px`;
   el.style.height=`${s.h}px`;
   el.querySelector('.node-icon').innerHTML=iconSvg(nodeIconKey(node),'node-svg');
@@ -761,7 +764,7 @@ function renderProperties(){
       <input class="form-control" id="nodeModel" value="${escapeHtml(node.model)}">
       <label class="form-label">カードサイズ</label>
       <select class="form-control" id="nodeSize">
-        ${optionList(['small','medium','large'],node.size,{small:'小',medium:'中',large:'大'})}
+        ${optionList(['small','medium','large','xlarge'],node.size,{small:'小',medium:'中',large:'大',xlarge:'特大'})}
       </select>
       <label class="form-label">メモ</label>
       <textarea class="form-control" id="nodeNote" rows="2">${escapeHtml(node.note)}</textarea>
@@ -1263,7 +1266,8 @@ pngBtn.addEventListener('click',async()=>{
         ctx.fillText(node.model,x+10,y+49);noteY=y+64;
       }
       ctx.fillStyle='#aab4c5';ctx.font='9px "Segoe UI",Arial,sans-serif';
-      String(node.note||'').split(/\n/).slice(0,2).forEach((line,i)=>ctx.fillText(line,x+10,noteY+i*12));
+      const noteLimit=node.size==='xlarge'?6:2;
+      String(node.note||'').split(/\n/).slice(0,noteLimit).forEach((line,i)=>ctx.fillText(line,x+10,noteY+i*12));
       ctx.restore();
     });
 

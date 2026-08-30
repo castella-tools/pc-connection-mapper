@@ -214,3 +214,13 @@ textarea.form-control{resize:vertical;min-height:62px;line-height:1.4}
 .shortcut-list{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin-top:10px;font-size:10px;color:#b8c3d2}
 .shortcut-list kbd{font:10px Consolas,monospace;padding:2px 6px;border:1px solid #3b4659;border-bottom-width:2px;border-radius:5px;background:#121720;color:#e5ebf3}
 @media(max-width:780px){.welcome-grid{grid-template-columns:1fr}.top-actions{overflow-x:auto}.save-status{display:none}}
+
+.node.size-xlarge .node-head{padding:12px 13px 7px}
+.node.size-xlarge .node-title{font-size:15px}
+.node.size-xlarge .node-model{font-size:11px;margin-top:3px}
+.node.size-xlarge .node-note{
+  padding:3px 13px 12px;
+  font-size:11px;
+  line-height:1.45;
+  -webkit-line-clamp:6;
+}
