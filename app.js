@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.20 loaded');
+console.info('PC Connection Mapper app.js v1.21 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -304,7 +304,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.20',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.21',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -340,7 +340,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.20',
+    version:'1.21',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -353,7 +353,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.20',
+    version:'1.21',
     nextId:7,
     nextGroupId:3,
     diagram:{title:'My Desktop Setup',x:1240,y:770},
@@ -1896,6 +1896,35 @@ function hexToRgba(hex,alpha){
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
+function loadPngDeviceIcon(iconKey,color){
+  const body=ICON_SVGS[iconKey] || ICON_SVGS.other;
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+  const src=`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>resolve(img);
+    img.onerror=()=>reject(new Error(`アイコンを読み込めませんでした: ${iconKey}`));
+    img.src=src;
+  });
+}
+
+async function preparePngDeviceIcons(){
+  const promises=new Map();
+  state.nodes.forEach(node=>{
+    const iconKey=nodeIconKey(node);
+    const color=deviceAccent(node.type);
+    const cacheKey=`${iconKey}|${color}`;
+    if(!promises.has(cacheKey)) promises.set(cacheKey,loadPngDeviceIcon(iconKey,color));
+  });
+
+  const images=new Map();
+  await Promise.all([...promises.entries()].map(async([key,promise])=>{
+    try{images.set(key,await promise)}
+    catch(err){console.warn(err)}
+  }));
+  return images;
+}
+
 function roundRect(ctx,x,y,w,h,r){
   const rr=Math.min(r,w/2,h/2);
   ctx.beginPath();
@@ -1946,6 +1975,7 @@ pngBtn.addEventListener('click',async()=>{
     canvas.height=Math.ceil(bounds.h*scale);
     const ctx=canvas.getContext('2d');
     ctx.scale(scale,scale);
+    const pngIcons=await preparePngDeviceIcons();
 
     ctx.fillStyle='#0f131b';
     ctx.fillRect(0,0,bounds.w,bounds.h);
@@ -2009,26 +2039,61 @@ pngBtn.addEventListener('click',async()=>{
 
     state.nodes.forEach(node=>{
       const s=cardSize(node),x=node.x-bounds.x,y=node.y-bounds.y;
+      const accent=deviceAccent(node.type);
       ctx.save();
+
       ctx.fillStyle='#1d2430';ctx.strokeStyle='#3b455a';ctx.lineWidth=1;
       roundRect(ctx,x,y,s.w,s.h,14);ctx.fill();ctx.stroke();
-      ctx.fillStyle=deviceAccent(node.type);
+
+      ctx.fillStyle=accent;
       ctx.fillRect(x+14,y+1,s.w-28,3);
 
-      ctx.textAlign='left';
-      ctx.fillStyle='#edf2f7';ctx.font='700 13px "Segoe UI",Arial,sans-serif';
-      ctx.fillText(node.name||node.type,x+10,y+21);
-      ctx.fillStyle='#909bad';ctx.font='9px "Segoe UI",Arial,sans-serif';
-      ctx.fillText(node.type,x+10,y+35);
+      // Icon container — mirrors the SVG icon shown on the live card.
+      const iconBoxX=x+10,iconBoxY=y+(node.size==='xlarge'?12:9);
+      ctx.fillStyle='#192131';
+      ctx.strokeStyle='#313d52';
+      ctx.lineWidth=1;
+      roundRect(ctx,iconBoxX,iconBoxY,28,28,8);ctx.fill();ctx.stroke();
 
-      let noteY=y+52;
+      const cacheKey=`${nodeIconKey(node)}|${accent}`;
+      const iconImg=pngIcons.get(cacheKey);
+      if(iconImg) ctx.drawImage(iconImg,iconBoxX+4,iconBoxY+4,20,20);
+
+      const textX=x+46;
+      const titleY=y+(node.size==='xlarge'?27:21);
+      ctx.textAlign='left';
+      ctx.fillStyle='#edf2f7';
+      ctx.font=`700 ${node.size==='xlarge'?15:13}px "Segoe UI",Arial,sans-serif`;
+      ctx.fillText(node.name||node.type,textX,titleY);
+
+      ctx.fillStyle='#909bad';ctx.font='9px "Segoe UI",Arial,sans-serif';
+      ctx.fillText(node.type,textX,titleY+13);
+
+      let noteY=y+(node.size==='xlarge'?67:52);
       if(node.model){
-        ctx.fillStyle='#9cabc0';ctx.font='10px "Segoe UI",Arial,sans-serif';
-        ctx.fillText(node.model,x+10,y+49);noteY=y+64;
+        ctx.fillStyle='#9cabc0';
+        ctx.font=`${node.size==='xlarge'?11:10}px "Segoe UI",Arial,sans-serif`;
+        ctx.fillText(node.model,textX,titleY+27);
+        noteY=y+(node.size==='xlarge'?82:64);
       }
-      ctx.fillStyle='#aab4c5';ctx.font='9px "Segoe UI",Arial,sans-serif';
+
+      ctx.fillStyle='#aab4c5';ctx.font=`${node.size==='xlarge'?11:9}px "Segoe UI",Arial,sans-serif`;
       const noteLimit=node.size==='xlarge'?6:2;
-      String(node.note||'').split(/\n/).slice(0,noteLimit).forEach((line,i)=>ctx.fillText(line,x+10,noteY+i*12));
+      const lineHeight=node.size==='xlarge'?16:12;
+      String(node.note||'').split(/\n/).slice(0,noteLimit).forEach((line,i)=>{
+        ctx.fillText(line,x+(node.size==='xlarge'?13:10),noteY+i*lineHeight);
+      });
+
+      if(node.locked){
+        ctx.font='700 7px "Segoe UI",Arial,sans-serif';
+        const lockText='LOCK';
+        const tw=ctx.measureText(lockText).width;
+        const bx=x+s.w-tw-18,by=y+s.h-18;
+        ctx.fillStyle='#131925';ctx.strokeStyle='#3d4a60';
+        roundRect(ctx,bx,by,tw+10,12,4);ctx.fill();ctx.stroke();
+        ctx.fillStyle='#8ea1bb';ctx.fillText(lockText,bx+5,by+9);
+      }
+
       ctx.restore();
     });
 
