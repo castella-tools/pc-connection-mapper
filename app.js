@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.15 loaded');
+console.info('PC Connection Mapper app.js v1.16 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -267,7 +267,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.15',nextId:1,nodes:[],edges:[],view:{x:0,y:0,scale:1}};
+  return {version:'1.16',nextId:1,nodes:[],edges:[],view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -303,7 +303,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.15',
+    version:'1.16',
     nodes:state.nodes,
     edges:state.edges,
     view:state.view,
@@ -313,7 +313,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.15',
+    version:'1.16',
     nextId:7,
     nodes:[
       {id:1,type:'PC',iconKey:'pc',size:'large',name:'Main PC',model:'Custom Build',note:'Gaming / Workstation',x:1500,y:1050},
@@ -433,6 +433,14 @@ function renderAll(){
   renderProperties();
 }
 
+function syncNodeSelectionStyles(){
+  nodesLayer.querySelectorAll('.node').forEach(el=>{
+    const id = Number(el.dataset.id);
+    el.classList.toggle('selected', state.selectedNodeId === id);
+    el.classList.toggle('connect-source', state.connectSourceId === id);
+  });
+}
+
 function renderNodes(){
   nodesLayer.innerHTML = '';
   state.nodes.forEach(node=>{
@@ -476,8 +484,8 @@ function bindNodeDrag(el,node){
     e.stopPropagation();
     state.selectedNodeId = node.id;
     state.selectedEdgeId = null;
+    syncNodeSelectionStyles();
     renderProperties();
-    el.classList.add('selected');
 
     drag = {id:e.pointerId,sx:e.clientX,sy:e.clientY,ox:node.x,oy:node.y,moved:false,before:contentSnapshot()};
     el.setPointerCapture(e.pointerId);
