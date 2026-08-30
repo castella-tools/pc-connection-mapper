@@ -63,14 +63,21 @@ button{user-select:none}
   letter-spacing:.08em;color:#cbd5e1;font-weight:800
 }
 .small-title{font-size:10px}
-.palette{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.palette{display:flex;flex-direction:column;gap:12px}
+.device-group{display:block}
+.device-group-title{font-size:9px;font-weight:800;letter-spacing:.08em;color:#77859a;margin:0 0 6px;padding:0 2px;text-transform:uppercase}
+.device-group-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .palette-btn{
-  min-height:58px;padding:7px;border:1px solid transparent;border-radius:10px;
-  background:#202735;color:var(--text);cursor:pointer;text-align:left;
+  min-height:56px;padding:8px;border:1px solid #293244;border-radius:10px;
+  background:#1d2430;color:var(--text);cursor:pointer;text-align:left;
+  transition:background .15s,border-color .15s,transform .15s;
 }
-.palette-btn:hover{border-color:#46536d;background:#252e3e}
-.palette-icon{font-size:18px;line-height:1}
-.palette-name{display:block;font-size:10px;font-weight:750;margin-top:4px}
+.palette-btn:hover{border-color:#52627d;background:#252f40;transform:translateY(-1px)}
+.palette-icon{display:flex;align-items:center;height:22px;color:#9fb7d8}
+.palette-name{display:block;font-size:10px;font-weight:750;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.palette-svg{width:20px;height:20px}
+.device-svg{width:20px;height:20px}
+.node-svg{width:20px;height:20px}
 .panel-box{
   margin-top:12px;padding:11px;border-radius:12px;
   border:1px solid var(--line);background:#1d2430
@@ -111,7 +118,7 @@ button{user-select:none}
   box-shadow:0 0 0 3px rgba(167,139,250,.16),0 10px 25px rgba(0,0,0,.3)
 }
 .node-head{display:flex;align-items:flex-start;gap:8px;padding:9px 10px 5px}
-.node-icon{font-size:18px;line-height:1}
+.node-icon{width:28px;height:28px;border-radius:8px;background:#192131;border:1px solid #313d52;color:#a9c2e5;display:grid;place-items:center;flex:0 0 auto}
 .node-content{min-width:0}
 .node-title{font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .node-type{font-size:9px;color:var(--muted)}

@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.13 loaded');
+console.info('PC Connection Mapper app.js v1.15 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -6,16 +6,104 @@ const STORAGE_KEY = 'pc-connection-mapper-v1';
 const INTRO_KEY = 'pc-connection-mapper-intro-seen-v1';
 const HISTORY_LIMIT = 50;
 
-const DEVICE_TYPES = [
-  ['PC','🖥️','large'],['Laptop','💻','medium'],['Monitor','🖵','medium'],
-  ['Keyboard','⌨️','small'],['Mouse','🖱️','small'],['Trackball','🖲️','small'],
-  ['USB Hub','🔌','medium'],['Dock','▣','medium'],['DAC','🎚️','medium'],
-  ['Audio I/F','🎛️','medium'],['Speaker','🔊','small'],['Headphone','🎧','small'],
-  ['Earphone','🎧','small'],['Microphone','🎙️','small'],['Webcam','📷','small'],
-  ['Controller','🎮','small'],['Router','🌐','medium'],['LAN Switch','⇆','medium'],
-  ['NAS','💾','medium'],['External Storage','▰','small'],['Printer','🖨️','medium'],
-  ['Power / UPS','⚡','medium'],['Other','◼️','small']
-].map(([type,icon,size])=>({type,icon,size}));
+const DEVICE_GROUPS = [
+  {
+    label:'PC・ディスプレイ',
+    items:[
+      ['PC','pc','large'],
+      ['Laptop','laptop','medium'],
+      ['Monitor','monitor','medium']
+    ]
+  },
+  {
+    label:'入力・操作',
+    items:[
+      ['Keyboard','keyboard','small'],
+      ['Mouse','mouse','small'],
+      ['Trackball','trackball','small'],
+      ['Controller','controller','small'],
+      ['Webcam','webcam','small']
+    ]
+  },
+  {
+    label:'USB・拡張',
+    items:[
+      ['USB Hub','usb-hub','medium'],
+      ['Dock','dock','medium'],
+      ['External Storage','storage','small']
+    ]
+  },
+  {
+    label:'オーディオ',
+    items:[
+      ['DAC','dac','medium'],
+      ['Audio I/F','audio-interface','medium'],
+      ['Speaker','speaker','small'],
+      ['Headphone','headphone','small'],
+      ['Earphone','earphone','small'],
+      ['Microphone','microphone','small']
+    ]
+  },
+  {
+    label:'ネットワーク・ストレージ',
+    items:[
+      ['Router','router','medium'],
+      ['LAN Switch','lan-switch','medium'],
+      ['NAS','nas','medium']
+    ]
+  },
+  {
+    label:'その他',
+    items:[
+      ['Printer','printer','medium'],
+      ['Power / UPS','power','medium'],
+      ['Other','other','small']
+    ]
+  }
+];
+
+const DEVICE_TYPES = DEVICE_GROUPS
+  .flatMap(group => group.items)
+  .map(([type,iconKey,size])=>({type,iconKey,size}));
+
+const ICON_SVGS = {
+  pc:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+  laptop:'<rect x="5" y="4" width="14" height="11" rx="2"/><path d="M3 19h18l-2-3H5z"/>',
+  monitor:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+  keyboard:'<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M9 10h.01M12 10h.01M15 10h.01M18 10h.01M6 13h.01M9 13h.01M12 13h.01M15 13h.01M18 13h.01M7 16h10"/>',
+  mouse:'<rect x="7" y="2.5" width="10" height="19" rx="5"/><path d="M12 2.5v6"/>',
+  trackball:'<rect x="5" y="3" width="14" height="18" rx="6"/><circle cx="12" cy="9" r="3"/>',
+  controller:'<path d="M8 8h8c3 0 5 2 5 5 0 4-2 7-4 7-1.5 0-2.3-2-3.5-2h-3C9.3 18 8.5 20 7 20c-2 0-4-3-4-7 0-3 2-5 5-5z"/><path d="M7 12h4M9 10v4M16 11h.01M18 13h.01"/>',
+  webcam:'<rect x="4" y="6" width="16" height="11" rx="3"/><circle cx="12" cy="11.5" r="3"/><path d="M9 21h6M12 17v4"/>',
+  'usb-hub':'<rect x="4" y="7" width="16" height="10" rx="2"/><path d="M8 7V4M12 7V3M16 7V4M8 17v3M12 17v4M16 17v3"/><circle cx="8" cy="4" r="1"/><circle cx="12" cy="3" r="1"/><circle cx="16" cy="4" r="1"/>',
+  dock:'<rect x="3" y="6" width="18" height="12" rx="3"/><path d="M7 10h4M7 14h2M15 10h2M14 14h3"/>',
+  storage:'<rect x="5" y="3" width="14" height="18" rx="3"/><circle cx="12" cy="15" r="1.5"/><path d="M8 7h8"/>',
+  dac:'<rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="8" cy="12" r="2.5"/><path d="M14 9h4M14 12h4M14 15h3"/>',
+  'audio-interface':'<rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="7" cy="12" r="2"/><circle cx="13" cy="12" r="2"/><path d="M17 9v6"/>',
+  speaker:'<rect x="6" y="3" width="12" height="18" rx="3"/><circle cx="12" cy="14" r="4"/><circle cx="12" cy="7" r="1.5"/>',
+  headphone:'<path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="13" width="4" height="7" rx="2"/><rect x="17" y="13" width="4" height="7" rx="2"/>',
+  earphone:'<path d="M7 5a4 4 0 1 1 4 4v9M17 5a4 4 0 1 0-4 4v9"/><path d="M11 18v3M13 18v3"/>',
+  microphone:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/>',
+  router:'<rect x="3" y="11" width="18" height="8" rx="2"/><path d="M7 11V7M17 11V7M8 15h.01M12 15h.01M16 15h.01"/><path d="M5 6c2-2 4-3 7-3s5 1 7 3"/>',
+  'lan-switch':'<rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 11h2v2H7zM11 11h2v2h-2zM15 11h2v2h-2z"/>',
+  nas:'<rect x="5" y="3" width="14" height="18" rx="3"/><path d="M8 7h8M8 11h8"/><circle cx="9" cy="16" r="1"/>',
+  printer:'<path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="9" rx="2"/><path d="M6 15h12v6H6zM17 12h.01"/>',
+  power:'<path d="M13 2 6 13h6l-1 9 7-12h-6z"/>',
+  other:'<rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 9h6v6H9z"/>'
+};
+
+function iconSvg(iconKey, className='device-svg'){
+  const body = ICON_SVGS[iconKey] || ICON_SVGS.other;
+  return `<svg class="${className}" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+}
+
+function deviceTypeInfo(type){
+  return DEVICE_TYPES.find(d=>d.type===type) || {type:'Other',iconKey:'other',size:'small'};
+}
+
+function nodeIconKey(node){
+  return node.iconKey || deviceTypeInfo(node.type).iconKey || 'other';
+}
 
 const CARD_SIZES = {
   small:{w:145,h:68},
@@ -179,7 +267,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.13',nextId:1,nodes:[],edges:[],view:{x:0,y:0,scale:1}};
+  return {version:'1.15',nextId:1,nodes:[],edges:[],view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -215,7 +303,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.13',
+    version:'1.15',
     nodes:state.nodes,
     edges:state.edges,
     view:state.view,
@@ -225,15 +313,15 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.13',
+    version:'1.15',
     nextId:7,
     nodes:[
-      {id:1,type:'PC',icon:'🖥️',size:'large',name:'Main PC',model:'Custom Build',note:'Gaming / Workstation',x:1500,y:1050},
-      {id:2,type:'Monitor',icon:'🖵',size:'medium',name:'4K Monitor',model:'32-inch / 144Hz',note:'Main Display',x:1820,y:890},
-      {id:3,type:'USB Hub',icon:'🔌',size:'medium',name:'USB Hub',model:'USB-C 10Gbps',note:'Desk Hub',x:1820,y:1070},
-      {id:4,type:'DAC',icon:'🎚️',size:'medium',name:'USB DAC',model:'Desktop DAC',note:'Earphone output',x:1820,y:1250},
-      {id:5,type:'Keyboard',icon:'⌨️',size:'small',name:'Keyboard',model:'',note:'USB',x:1240,y:950},
-      {id:6,type:'Mouse',icon:'🖱️',size:'small',name:'Mouse',model:'',note:'Wireless',x:1240,y:1150}
+      {id:1,type:'PC',iconKey:'pc',size:'large',name:'Main PC',model:'Custom Build',note:'Gaming / Workstation',x:1500,y:1050},
+      {id:2,type:'Monitor',iconKey:'monitor',size:'medium',name:'4K Monitor',model:'32-inch / 144Hz',note:'Main Display',x:1820,y:890},
+      {id:3,type:'USB Hub',iconKey:'usb-hub',size:'medium',name:'USB Hub',model:'USB-C 10Gbps',note:'Desk Hub',x:1820,y:1070},
+      {id:4,type:'DAC',iconKey:'dac',size:'medium',name:'USB DAC',model:'Desktop DAC',note:'Earphone output',x:1820,y:1250},
+      {id:5,type:'Keyboard',iconKey:'keyboard',size:'small',name:'Keyboard',model:'',note:'USB',x:1240,y:950},
+      {id:6,type:'Mouse',iconKey:'mouse',size:'small',name:'Mouse',model:'',note:'Wireless',x:1240,y:1150}
     ],
     edges:[
       {id:'e1',from:1,to:2,type:'DisplayPort',label:'DisplayPort',style:'curve',bend:.5,fromSide:'auto',toSide:'auto'},
@@ -262,7 +350,8 @@ function loadInitialState(){
 function applyImportedState(data, save=true){
   state.nodes = Array.isArray(data.nodes) ? data.nodes.map(n=>({
     ...n,
-    size:n.size || 'medium',
+    size:n.size || deviceTypeInfo(n.type).size || 'medium',
+    iconKey:n.iconKey || deviceTypeInfo(n.type).iconKey || 'other',
     model:n.model || '',
     note:n.note || ''
   })) : [];
@@ -291,12 +380,28 @@ function applyImportedState(data, save=true){
 
 function buildPalette(){
   palette.innerHTML = '';
-  DEVICE_TYPES.forEach(device=>{
-    const button = document.createElement('button');
-    button.className = 'palette-btn';
-    button.innerHTML = `<span class="palette-icon">${device.icon}</span><span class="palette-name">${escapeHtml(device.type)}</span>`;
-    button.addEventListener('click', ()=>addNode(device));
-    palette.appendChild(button);
+  DEVICE_GROUPS.forEach(group=>{
+    const section=document.createElement('section');
+    section.className='device-group';
+
+    const heading=document.createElement('div');
+    heading.className='device-group-title';
+    heading.textContent=group.label;
+    section.appendChild(heading);
+
+    const grid=document.createElement('div');
+    grid.className='device-group-grid';
+
+    group.items.forEach(([type,iconKey,size])=>{
+      const button=document.createElement('button');
+      button.className='palette-btn';
+      button.innerHTML=`<span class="palette-icon">${iconSvg(iconKey,'palette-svg')}</span><span class="palette-name">${escapeHtml(type)}</span>`;
+      button.addEventListener('click',()=>addNode({type,iconKey,size}));
+      grid.appendChild(button);
+    });
+
+    section.appendChild(grid);
+    palette.appendChild(section);
   });
 }
 
@@ -307,7 +412,7 @@ function addNode(device){
   const node = {
     id:state.nextId++,
     type:device.type,
-    icon:device.icon,
+    iconKey:device.iconKey,
     size:device.size,
     name:device.type,
     model:'',
@@ -343,7 +448,7 @@ function renderNodes(){
     el.style.height = `${s.h}px`;
     el.innerHTML = `
       <div class="node-head">
-        <div class="node-icon">${node.icon}</div>
+        <div class="node-icon">${iconSvg(nodeIconKey(node),'node-svg')}</div>
         <div class="node-content">
           <div class="node-title">${escapeHtml(node.name)}</div>
           <div class="node-type">${escapeHtml(node.type)}</div>
@@ -543,7 +648,7 @@ function updateNodeVisual(node){
   const s=cardSize(node);
   el.style.width=`${s.w}px`;
   el.style.height=`${s.h}px`;
-  el.querySelector('.node-icon').textContent=node.icon;
+  el.querySelector('.node-icon').innerHTML=iconSvg(nodeIconKey(node),'node-svg');
   el.querySelector('.node-title').textContent=node.name;
   el.querySelector('.node-type').textContent=node.type;
   el.querySelector('.node-model').textContent=node.model;
@@ -666,7 +771,7 @@ function renderProperties(){
   document.getElementById('nodeType').addEventListener('change',e=>{
     pushUndoSnapshot();
     const type=DEVICE_TYPES.find(d=>d.type===e.target.value);
-    node.type=type.type;node.icon=type.icon;updateNodeVisual(node);
+    node.type=type.type;node.iconKey=type.iconKey;updateNodeVisual(node);
   });
   document.getElementById('deleteNodeBtn').addEventListener('click',deleteSelection);
 }
@@ -1140,7 +1245,7 @@ pngBtn.addEventListener('click',async()=>{
 
       ctx.textAlign='left';
       ctx.fillStyle='#edf2f7';ctx.font='700 13px "Segoe UI",Arial,sans-serif';
-      ctx.fillText(`${node.icon}  ${node.name||node.type}`,x+10,y+21);
+      ctx.fillText(node.name||node.type,x+10,y+21);
       ctx.fillStyle='#909bad';ctx.font='9px "Segoe UI",Arial,sans-serif';
       ctx.fillText(node.type,x+10,y+35);
 
