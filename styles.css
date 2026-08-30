@@ -261,15 +261,19 @@ textarea.form-control{resize:vertical;min-height:62px;line-height:1.4}
 .node-icon{color:var(--cat-color,#a9c2e5)}
 
 .groups-layer,.diagram-title-layer,.guides-layer{
-  position:absolute;inset:0;width:100%;height:100%;pointer-events:none
+  position:absolute;inset:0;width:100%;height:100%
 }
+.groups-layer{pointer-events:none;z-index:4}
+.diagram-title-layer{pointer-events:none;z-index:6}
+.guides-layer{pointer-events:none;z-index:20}
 .group-frame{
   --group-color:#64748b;
   position:absolute;box-sizing:border-box;
   border:1.5px dashed color-mix(in srgb,var(--group-color) 62%,transparent);
   border-radius:18px;
   background:color-mix(in srgb,var(--group-color) 5%,transparent);
-  pointer-events:none;
+  pointer-events:auto;
+  cursor:default;
 }
 .group-frame.selected{
   border-style:solid;
@@ -317,3 +321,9 @@ textarea.form-control{resize:vertical;min-height:62px;line-height:1.4}
 .smart-guide.horizontal{left:0;right:0;height:1px;box-shadow:0 0 8px rgba(56,189,248,.45)}
 
 .color-control{height:36px;padding:4px;cursor:pointer}
+
+.group-title-bar{z-index:2}
+.group-resize{z-index:2}
+.group-frame:hover{
+  background:color-mix(in srgb,var(--group-color) 8%,transparent);
+}

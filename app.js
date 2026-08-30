@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.19 loaded');
+console.info('PC Connection Mapper app.js v1.20 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -304,7 +304,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.19',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.20',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -340,7 +340,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.19',
+    version:'1.20',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -353,7 +353,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.19',
+    version:'1.20',
     nextId:7,
     nextGroupId:3,
     diagram:{title:'My Desktop Setup',x:1240,y:770},
@@ -555,21 +555,49 @@ function bindGroupInteractions(el,group){
     renderProperties();
   };
 
-  title.addEventListener('pointerdown',e=>{
+  const beginMove=(e)=>{
     if(e.button!==0)return;
+    if(e.target.closest('.group-resize'))return;
     e.preventDefault();e.stopPropagation();
     selectGroup();
-    action={kind:'move',id:e.pointerId,sx:e.clientX,sy:e.clientY,x:group.x,y:group.y,before:contentSnapshot(),moved:false};
-    title.setPointerCapture(e.pointerId);
-  });
-  title.addEventListener('dblclick',e=>{e.stopPropagation();selectGroup();document.getElementById('groupTitle')?.focus();});
+    action={
+      kind:'move',
+      id:e.pointerId,
+      sx:e.clientX,sy:e.clientY,
+      x:group.x,y:group.y,
+      before:contentSnapshot(),
+      moved:false
+    };
+    el.setPointerCapture(e.pointerId);
+  };
 
-  handle.addEventListener('pointerdown',e=>{
+  const beginResize=(e)=>{
     if(e.button!==0)return;
     e.preventDefault();e.stopPropagation();
     selectGroup();
-    action={kind:'resize',id:e.pointerId,sx:e.clientX,sy:e.clientY,w:group.w,h:group.h,before:contentSnapshot(),moved:false};
+    action={
+      kind:'resize',
+      id:e.pointerId,
+      sx:e.clientX,sy:e.clientY,
+      w:group.w,h:group.h,
+      before:contentSnapshot(),
+      moved:false
+    };
     handle.setPointerCapture(e.pointerId);
+  };
+
+  el.addEventListener('pointerdown',beginMove);
+  handle.addEventListener('pointerdown',beginResize);
+
+  el.addEventListener('click',e=>{
+    e.stopPropagation();
+    selectGroup();
+  });
+
+  title.addEventListener('dblclick',e=>{
+    e.preventDefault();e.stopPropagation();
+    selectGroup();
+    requestAnimationFrame(()=>document.getElementById('groupTitle')?.focus());
   });
 
   const move=e=>{
@@ -577,27 +605,40 @@ function bindGroupInteractions(el,group){
     const dx=(e.clientX-action.sx)/state.view.scale;
     const dy=(e.clientY-action.sy)/state.view.scale;
     if(Math.abs(dx)+Math.abs(dy)>3)action.moved=true;
+
     if(action.kind==='move'){
       group.x=Math.max(0,Math.min(WORKSPACE.width-group.w,snap(action.x+dx)));
       group.y=Math.max(0,Math.min(WORKSPACE.height-group.h,snap(action.y+dy)));
-      el.style.left=`${group.x}px`;el.style.top=`${group.y}px`;
+      el.style.left=`${group.x}px`;
+      el.style.top=`${group.y}px`;
     }else{
       group.w=Math.max(220,Math.min(WORKSPACE.width-group.x,snap(action.w+dx)));
       group.h=Math.max(140,Math.min(WORKSPACE.height-group.y,snap(action.h+dy)));
-      el.style.width=`${group.w}px`;el.style.height=`${group.h}px`;
+      el.style.width=`${group.w}px`;
+      el.style.height=`${group.h}px`;
     }
   };
+
   const up=e=>{
     if(!action||action.id!==e.pointerId)return;
     const current=action;
     action=null;
-    if(current.moved){pushUndoSnapshot(current.before);scheduleSave();}
+
+    try{
+      if(el.hasPointerCapture(e.pointerId))el.releasePointerCapture(e.pointerId);
+    }catch{}
+
+    if(current.moved){
+      pushUndoSnapshot(current.before);
+      scheduleSave();
+    }
     renderProperties();
   };
-  title.addEventListener('pointermove',move);title.addEventListener('pointerup',up);
-  handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',up);
-}
 
+  el.addEventListener('pointermove',move);
+  el.addEventListener('pointerup',up);
+  el.addEventListener('pointercancel',up);
+}
 function renderGroupVisual(group){
   const el=groupsLayer.querySelector(`[data-id="${group.id}"]`);
   if(!el)return;
@@ -656,7 +697,7 @@ function renderDiagramTitle(){
     const d=drag;drag=null;
     if(d.moved){pushUndoSnapshot(d.before);scheduleSave();}
   });
-  el.addEventListener('dblclick',e=>{e.stopPropagation();showTitleModal();});
+  el.addEventListener('dblclick',e=>{e.preventDefault();e.stopPropagation();showTitleModal();});
 }
 
 function layoutBoundsRaw(includeTitle=true){
@@ -1256,6 +1297,7 @@ function renderProperties(){
     properties.innerHTML=`
       <div class="form-section">
         <h3>グループ枠</h3>
+        <div class="selection-summary"><strong>選択中</strong>：${escapeHtml(group.title)}</div>
         <label class="form-label">グループ名</label>
         <input class="form-control" id="groupTitle" value="${escapeHtml(group.title)}">
         <div class="form-grid">
@@ -1603,7 +1645,7 @@ viewport.addEventListener('pointerdown',e=>{
   if(state.connectMode)return;
   if(e.button!==0&&e.button!==1)return;
   if(e.target.closest('.node'))return;
-  if(e.target.closest('.group-title-bar')||e.target.closest('.group-resize')||e.target.closest('.diagram-title-card'))return;
+  if(e.target.closest('.group-frame')||e.target.closest('.diagram-title-card'))return;
   if(e.target.closest('.view-controls'))return;
   if(e.target.classList.contains('edge-hit')||e.target.classList.contains('edge-label'))return;
 
