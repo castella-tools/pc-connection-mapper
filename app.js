@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.28 loaded');
+console.info('PC Connection Mapper app.js v1.29 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -366,7 +366,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.28',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.29',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -400,7 +400,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.28',
+    version:'1.29',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -413,7 +413,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.28',
+    version:'1.29',
     nextId:14,
     nextGroupId:5,
     diagram:{title:'Home PC & Network Setup',x:720,y:570},
@@ -2294,15 +2294,50 @@ async function renderPng(options){
     state.groups.forEach(group=>{
       const x=group.x-bounds.x,y=group.y-bounds.y;
       ctx.save();
-      ctx.fillStyle=hexToRgba(group.color,.055);
-      ctx.strokeStyle=hexToRgba(group.color,.6);
-      ctx.lineWidth=1.5;
-      ctx.setLineDash([8,6]);
-      roundRect(ctx,x,y,group.w,group.h,16);ctx.fill();ctx.stroke();
+
+      // Group body: match the live CSS as closely as Canvas allows.
+      ctx.fillStyle=hexToRgba(group.color,.05);
+      ctx.strokeStyle=hexToRgba(group.color,.62);
+      ctx.lineWidth=1.25;
+      ctx.setLineDash([4,4]);
+      roundRect(ctx,x,y,group.w,group.h,18);
+      ctx.fill();
+      ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle=hexToRgba(group.color,.95);
-      ctx.font='700 11px "Segoe UI","Yu Gothic UI","Yu Gothic","Meiryo",Arial,sans-serif';
-      ctx.fillText(group.title,x+14,y+21);
+
+      // Group title pill.
+      const uiFont='"Segoe UI","Yu Gothic UI","Yu Gothic","Meiryo",Arial,sans-serif';
+      ctx.font=`700 10px ${uiFont}`;
+      const title=String(group.title||'グループ');
+      const titleWidth=Math.min(group.w-48,Math.max(54,ctx.measureText(title).width+31));
+      const pillX=x+12;
+      const pillY=y-14;
+      const pillH=25;
+
+      ctx.fillStyle='#171d27';
+      ctx.strokeStyle=hexToRgba(group.color,.52);
+      ctx.lineWidth=1;
+      roundRect(ctx,pillX,pillY,titleWidth,pillH,8);
+      ctx.fill();
+      ctx.stroke();
+
+      // Colored dot.
+      ctx.beginPath();
+      ctx.arc(pillX+10,pillY+pillH/2,3,0,Math.PI*2);
+      ctx.fillStyle=group.color;
+      ctx.fill();
+
+      // Title text.
+      ctx.fillStyle='#dce5f1';
+      ctx.textAlign='left';
+      ctx.textBaseline='middle';
+      const maxTextWidth=titleWidth-24;
+      ctx.fillText(
+        canvasEllipsis(ctx,title,maxTextWidth),
+        pillX+18,
+        pillY+pillH/2+.5
+      );
+
       ctx.restore();
     });
   }
