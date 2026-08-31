@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.24 loaded');
+console.info('PC Connection Mapper app.js v1.25 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -334,7 +334,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.24',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.25',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -370,7 +370,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.24',
+    version:'1.25',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -383,7 +383,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.24',
+    version:'1.25',
     nextId:7,
     nextGroupId:3,
     diagram:{title:'My Desktop Setup',x:1240,y:770},
@@ -528,10 +528,10 @@ function buildPalette(filterValue=deviceSearch?.value||''){
     heading.setAttribute('aria-expanded',String(!collapsed));
     heading.innerHTML=`
       <span class="device-group-heading">
-        <span class="device-group-chevron" aria-hidden="true">⌄</span>
-        <span>${escapeHtml(group.label)}</span>
+        <span class="device-group-marker" aria-hidden="true"></span>
+        <span class="device-group-label">${escapeHtml(group.label)}</span>
       </span>
-      <span class="device-group-count">${matchingItems.length}</span>
+      <span class="device-group-chevron" aria-hidden="true"></span>
     `;
     heading.addEventListener('click',()=>{
       if(query)return;
@@ -2174,13 +2174,12 @@ function drawEdgeCanvas(ctx,edge,offsetX,offsetY){
 }
 
 function loadPngOptions(){
-  const defaults={grid:true,groups:true,background:'dark',scale:2};
+  const defaults={grid:true,groups:true,scale:2};
   try{
     const saved=JSON.parse(localStorage.getItem(PNG_OPTIONS_KEY)||'{}');
     return{
       grid:saved.grid!==false,
       groups:saved.groups!==false,
-      background:saved.background==='transparent'?'transparent':'dark',
       scale:[1,2,4].includes(+saved.scale)?+saved.scale:2
     };
   }catch{
@@ -2210,36 +2209,28 @@ async function renderPng(options){
   ctx.scale(scale,scale);
   const pngIcons=await preparePngDeviceIcons();
 
-  if(options.background==='dark'){
-    ctx.fillStyle='#0f131b';
-    ctx.fillRect(0,0,bounds.w,bounds.h);
-  }else{
-    ctx.clearRect(0,0,bounds.w,bounds.h);
-  }
+  ctx.fillStyle='#0f131b';
+  ctx.fillRect(0,0,bounds.w,bounds.h);
 
   if(options.grid){
     ctx.lineWidth=1;
     for(let x=Math.floor(bounds.x/20)*20;x<=bounds.x+bounds.w;x+=20){
       const xx=x-bounds.x+.5;
       ctx.beginPath();ctx.moveTo(xx,0);ctx.lineTo(xx,bounds.h);
-      ctx.strokeStyle=x%100===0
-        ? (options.background==='transparent'?'rgba(100,116,139,.34)':'#222936')
-        : (options.background==='transparent'?'rgba(100,116,139,.18)':'#171d27');
+      ctx.strokeStyle=x%100===0?'#222936':'#171d27';
       ctx.stroke();
     }
     for(let y=Math.floor(bounds.y/20)*20;y<=bounds.y+bounds.h;y+=20){
       const yy=y-bounds.y+.5;
       ctx.beginPath();ctx.moveTo(0,yy);ctx.lineTo(bounds.w,yy);
-      ctx.strokeStyle=y%100===0
-        ? (options.background==='transparent'?'rgba(100,116,139,.34)':'#222936')
-        : (options.background==='transparent'?'rgba(100,116,139,.18)':'#171d27');
+      ctx.strokeStyle=y%100===0?'#222936':'#171d27';
       ctx.stroke();
     }
   }
 
   if((state.diagram?.title||'').trim()){
     ctx.save();
-    ctx.fillStyle=options.background==='transparent'?'#172033':'#f1f5f9';
+    ctx.fillStyle='#f1f5f9';
     ctx.font='700 24px "Segoe UI","Yu Gothic UI","Yu Gothic","Meiryo",Arial,sans-serif';
     ctx.textAlign='left';
     ctx.fillText(state.diagram.title,state.diagram.x-bounds.x,state.diagram.y-bounds.y+30);
@@ -2277,7 +2268,7 @@ async function renderPng(options){
       ctx.font='11px "Segoe UI","Yu Gothic UI","Yu Gothic","Meiryo",Arial,sans-serif';
       ctx.textAlign='center';
       const width=ctx.measureText(label).width;
-      ctx.fillStyle=options.background==='transparent'?'rgba(15,19,27,.82)':'rgba(15,19,27,.92)';
+      ctx.fillStyle='rgba(15,19,27,.92)';
       ctx.fillRect(labelPoint.x-width/2-4,labelPoint.y-12,width+8,16);
       ctx.fillStyle='#d7deea';ctx.fillText(label,labelPoint.x,labelPoint.y);
       ctx.restore();
@@ -2384,21 +2375,6 @@ function showPngExportSettings(){
           <input id="pngGroups" type="checkbox" ${options.groups?'checked':''}>
         </label>
       </div>
-
-      <div class="png-setting-section">
-        <div class="png-setting-title">背景</div>
-        <div class="png-radio-grid">
-          <label class="png-radio-card">
-            <input type="radio" name="pngBackground" value="dark" ${options.background==='dark'?'checked':''}>
-            <span><strong>ダーク</strong><small>画面と同じ背景</small></span>
-          </label>
-          <label class="png-radio-card">
-            <input type="radio" name="pngBackground" value="transparent" ${options.background==='transparent'?'checked':''}>
-            <span><strong>透明</strong><small>資料への貼り付け向け</small></span>
-          </label>
-        </div>
-      </div>
-
       <div class="png-setting-section">
         <div class="png-setting-title">解像度</div>
         <div class="png-scale-options">
@@ -2430,7 +2406,6 @@ function showPngExportSettings(){
     const current={
       grid:document.getElementById('pngGrid').checked,
       groups:document.getElementById('pngGroups').checked,
-      background:document.querySelector('input[name="pngBackground"]:checked')?.value||'dark',
       scale:+document.querySelector('input[name="pngScale"]:checked')?.value||2
     };
     savePngOptions(current);
@@ -2443,7 +2418,7 @@ function showPngExportSettings(){
 
     try{
       const result=await renderPng(current);
-      previewArea.innerHTML=`<div class="png-preview-shell ${current.background==='transparent'?'transparent':''}"><img class="export-preview" id="pngPreview" alt="PNG preview"></div>`;
+      previewArea.innerHTML=`<div class="png-preview-shell"><img class="export-preview" id="pngPreview" alt="PNG preview"></div>`;
       document.getElementById('pngPreview').src=result.dataUrl;
       info.textContent=`${result.width.toLocaleString()} × ${result.height.toLocaleString()} px`;
       modalDownloadLink.href=result.dataUrl;
