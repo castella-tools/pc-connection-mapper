@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.32 loaded');
+console.info('PC Connection Mapper app.js v1.33 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -388,7 +388,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.32',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.33',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -422,7 +422,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.32',
+    version:'1.33',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -437,7 +437,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.32',
+    version:'1.33',
     nextId:14,
     nextGroupId:5,
     nextAnnotationId:2,
@@ -698,6 +698,8 @@ function addNode(device){
   state.selectedNodeId = node.id;
   state.selectedNodeIds = [node.id];
   state.selectedEdgeId = null;
+  state.selectedGroupId = null;
+  state.selectedAnnotationId = null;
   renderAll();
   scheduleSave();
 }
@@ -2261,31 +2263,6 @@ modalCloseBtn.addEventListener('click',closeModal);
 modalCloseBtn2.addEventListener('click',closeModal);
 exportModal.addEventListener('click',e=>{if(e.target===exportModal)closeModal()});
 helpBtn.addEventListener('click',()=>showHelpModal(false));
-
-async function saveBlob(blob,filename,mime){
-  try{
-    if(window.showSaveFilePicker){
-      const ext='.'+filename.split('.').pop();
-      const handle=await window.showSaveFilePicker({
-        suggestedName:filename,
-        types:[{description:filename,accept:{[mime]:[ext]}}]
-      });
-      const writable=await handle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      showToast(`${filename} を保存しました`);
-      return;
-    }
-  }catch(err){
-    if(err?.name==='AbortError')return;
-    console.warn(err);
-  }
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;a.download=filename;
-  document.body.appendChild(a);a.click();a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),3000);
-}
 
 jsonSaveBtn.addEventListener('click',()=>{
   const json=JSON.stringify(serializableState(),null,2);

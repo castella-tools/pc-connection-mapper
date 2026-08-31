@@ -9,7 +9,7 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
   <link rel="apple-touch-icon" href="./icon-192.png">
-  <link rel="stylesheet" href="./styles.css?v=1.32">
+  <link rel="stylesheet" href="./styles.css?v=1.33">
 </head>
 <body>
   <div id="app" class="app">
@@ -17,7 +17,7 @@
       <div class="brand">
         <span class="brand-mark">⌘</span>
         <span>PC Connection Mapper</span>
-        <span class="version">v1.32</span>
+        <span class="version">v1.33</span>
       </div>
       <div class="top-actions">
         <button class="btn ghost" id="toggleLeftBtn">デバイス</button>
@@ -36,7 +36,7 @@
       </div>
     </header>
 
-    <aside class="sidebar left-panel" id="leftPanel">
+    <aside class="sidebar left-panel">
       <div class="panel-title">デバイス</div>
       <div class="device-search-wrap">
         <svg class="device-search-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -79,7 +79,7 @@
       </div>
     </main>
 
-    <aside class="sidebar right-panel" id="rightPanel">
+    <aside class="sidebar right-panel">
       <div class="panel-title">プロパティ</div>
       <div id="properties" class="properties-empty">機器またはケーブルを選択してください。</div>
     </aside>
@@ -102,11 +102,11 @@
 
   <div class="toast" id="toast"></div>
 
-  <script type="module" src="./app.js?v=1.32"></script>
+  <script type="module" src="./app.js?v=1.33"></script>
   <script>
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=1.32', { updateViaCache: 'none' }).catch(console.warn);
+        navigator.serviceWorker.register('./sw.js?v=1.33', { updateViaCache: 'none' }).catch(console.warn);
       });
     }
   </script>
