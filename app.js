@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.25 loaded');
+console.info('PC Connection Mapper app.js v1.26 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -216,7 +216,6 @@ const deviceSearch = document.getElementById('deviceSearch');
 const clearDeviceSearchBtn = document.getElementById('clearDeviceSearchBtn');
 const properties = document.getElementById('properties');
 const snapToggle = document.getElementById('snapToggle');
-const saveStatus = document.getElementById('saveStatus');
 
 const connectBtn = document.getElementById('connectBtn');
 const jsonSaveBtn = document.getElementById('jsonSaveBtn');
@@ -334,7 +333,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.25',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.26',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -354,23 +353,21 @@ function showToast(message){
 }
 
 function scheduleSave(){
-  saveStatus.textContent = '保存中…';
   clearTimeout(saveTimer);
   saveTimer = setTimeout(()=>{
     try{
       const data = serializableState();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      saveStatus.textContent = '自動保存済み';
     }catch(err){
       console.error(err);
-      saveStatus.textContent = '自動保存エラー';
+      showToast('自動保存に失敗しました');
     }
   }, 250);
 }
 
 function serializableState(){
   return {
-    version:'1.25',
+    version:'1.26',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -383,7 +380,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.25',
+    version:'1.26',
     nextId:7,
     nextGroupId:3,
     diagram:{title:'My Desktop Setup',x:1240,y:770},
