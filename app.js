@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.26 loaded');
+console.info('PC Connection Mapper app.js v1.27 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -11,7 +11,11 @@ const PNG_OPTIONS_KEY = 'pc-connection-mapper-png-options-v1';
 const DEVICE_SEARCH_ALIASES = {
   'PC':'パソコン デスクトップ computer',
   'Laptop':'ノート ノートPC notebook',
+  'Smartphone':'スマートフォン スマホ phone mobile',
+  'Game Console':'ゲーム機 console PS5 PlayStation Xbox Switch',
   'Monitor':'モニター ディスプレイ display',
+  'KVM Switch':'KVM 切替器 切替 switch',
+  'Capture Card':'キャプチャーボード キャプチャカード capture',
   'Keyboard':'キーボード',
   'Mouse':'マウス',
   'Trackball':'トラックボール',
@@ -26,21 +30,33 @@ const DEVICE_SEARCH_ALIASES = {
   'Headphone':'ヘッドホン',
   'Earphone':'イヤホン',
   'Microphone':'マイク マイクロフォン',
+  'ONU / Modem':'ONU モデム modem 回線終端',
   'Router':'ルーター',
+  'Access Point':'アクセスポイント AP Wi-Fi 無線',
   'LAN Switch':'LANスイッチ スイッチングハブ',
   'NAS':'NAS ネットワークストレージ',
-  'Printer':'プリンター',
   'Power / UPS':'電源 UPS',
+  'Power Strip':'電源タップ タップ power strip',
+  'Printer':'プリンター',
   'Other':'その他'
 };
 
 const DEVICE_GROUPS = [
   {
-    label:'PC・ディスプレイ',
+    label:'PC・端末',
     items:[
       ['PC','pc','large'],
       ['Laptop','laptop','medium'],
-      ['Monitor','monitor','medium']
+      ['Smartphone','smartphone','small'],
+      ['Game Console','game-console','medium']
+    ]
+  },
+  {
+    label:'ディスプレイ・映像',
+    items:[
+      ['Monitor','monitor','medium'],
+      ['KVM Switch','kvm-switch','medium'],
+      ['Capture Card','capture-card','medium']
     ]
   },
   {
@@ -75,16 +91,24 @@ const DEVICE_GROUPS = [
   {
     label:'ネットワーク・ストレージ',
     items:[
+      ['ONU / Modem','modem','medium'],
       ['Router','router','medium'],
+      ['Access Point','access-point','medium'],
       ['LAN Switch','lan-switch','medium'],
       ['NAS','nas','medium']
+    ]
+  },
+  {
+    label:'電源',
+    items:[
+      ['Power / UPS','power','medium'],
+      ['Power Strip','power-strip','medium']
     ]
   },
   {
     label:'その他',
     items:[
       ['Printer','printer','medium'],
-      ['Power / UPS','power','medium'],
       ['Other','other','small']
     ]
   }
@@ -95,11 +119,13 @@ const DEVICE_TYPES = DEVICE_GROUPS
   .map(([type,iconKey,size])=>({type,iconKey,size}));
 
 const DEVICE_CATEGORY_ACCENTS = {
-  'PC・ディスプレイ':'#60a5fa',
+  'PC・端末':'#60a5fa',
+  'ディスプレイ・映像':'#818cf8',
   '入力・操作':'#38bdf8',
   'USB・拡張':'#a78bfa',
   'オーディオ':'#34d399',
   'ネットワーク・ストレージ':'#fb923c',
+  '電源':'#f59e0b',
   'その他':'#94a3b8'
 };
 
@@ -140,6 +166,13 @@ const ICON_SVGS = {
   nas:'<rect x="5" y="3" width="14" height="18" rx="3"/><path d="M8 7h8M8 11h8"/><circle cx="9" cy="16" r="1"/>',
   printer:'<path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="9" rx="2"/><path d="M6 15h12v6H6zM17 12h.01"/>',
   power:'<path d="M13 2 6 13h6l-1 9 7-12h-6z"/>',
+  smartphone:'<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M10 5h4M11 18.5h2"/>',
+  'game-console':'<path d="M8 8h8c3 0 5 2 5 5 0 4-2 7-4 7-1.5 0-2.3-2-3.5-2h-3C9.3 18 8.5 20 7 20c-2 0-4-3-4-7 0-3 2-5 5-5z"/><path d="M7 12h4M9 10v4M16 11h.01M18 13h.01"/>',
+  'kvm-switch':'<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h4M7 14h4M15 9v6M18 10v4"/><path d="M12 3v3M12 18v3"/>',
+  'capture-card':'<rect x="4" y="5" width="16" height="14" rx="3"/><path d="M8 9h8v6H8z"/><path d="M2 12h2M20 12h2"/>',
+  modem:'<rect x="4" y="6" width="16" height="12" rx="3"/><path d="M8 10h.01M11 10h.01M14 10h.01M8 14h8"/><path d="M12 3v3"/>',
+  'access-point':'<rect x="6" y="9" width="12" height="9" rx="2"/><path d="M12 18v3"/><path d="M8 7c1.1-1.1 2.4-1.6 4-1.6S14.9 5.9 16 7M5 4c1.9-1.8 4.2-2.7 7-2.7S17.1 2.2 19 4"/>',
+  'power-strip':'<rect x="3" y="7" width="18" height="10" rx="3"/><circle cx="8" cy="12" r="1.6"/><circle cx="13" cy="12" r="1.6"/><path d="M18 10v4M21 12h2"/>',
   other:'<rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 9h6v6H9z"/>'
 };
 
@@ -333,7 +366,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.26',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.27',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -367,7 +400,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.26',
+    version:'1.27',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -380,7 +413,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.26',
+    version:'1.27',
     nextId:7,
     nextGroupId:3,
     diagram:{title:'My Desktop Setup',x:1240,y:770},

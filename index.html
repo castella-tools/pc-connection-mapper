@@ -9,7 +9,7 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
   <link rel="apple-touch-icon" href="./icon-192.png">
-  <link rel="stylesheet" href="./styles.css?v=1.26">
+  <link rel="stylesheet" href="./styles.css?v=1.27">
 </head>
 <body>
   <div id="app" class="app">
@@ -17,7 +17,7 @@
       <div class="brand">
         <span class="brand-mark">⌘</span>
         <span>PC Connection Mapper</span>
-        <span class="version">v1.26</span>
+        <span class="version">v1.27</span>
       </div>
       <div class="top-actions">
         <button class="btn ghost" id="toggleLeftBtn">デバイス</button>
@@ -101,11 +101,11 @@
 
   <div class="toast" id="toast"></div>
 
-  <script type="module" src="./app.js?v=1.26"></script>
+  <script type="module" src="./app.js?v=1.27"></script>
   <script>
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=1.26', { updateViaCache: 'none' }).catch(console.warn);
+        navigator.serviceWorker.register('./sw.js?v=1.27', { updateViaCache: 'none' }).catch(console.warn);
       });
     }
   </script>
