@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.27 loaded');
+console.info('PC Connection Mapper app.js v1.28 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -366,7 +366,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.27',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.28',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -400,7 +400,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.27',
+    version:'1.28',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -413,28 +413,51 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.27',
-    nextId:7,
-    nextGroupId:3,
-    diagram:{title:'My Desktop Setup',x:1240,y:770},
+    version:'1.28',
+    nextId:14,
+    nextGroupId:5,
+    diagram:{title:'Home PC & Network Setup',x:720,y:570},
     groups:[
-      {id:1,title:'Input Devices',x:1180,y:880,w:240,h:380,color:'#38bdf8'},
-      {id:2,title:'Main System',x:1450,y:840,w:580,h:570,color:'#60a5fa'}
+      {id:1,title:'Network',x:680,y:680,w:790,h:220,color:'#fb923c'},
+      {id:2,title:'Desk / Main PC',x:1530,y:650,w:1030,h:430,color:'#60a5fa'},
+      {id:3,title:'Wireless',x:800,y:980,w:600,h:250,color:'#a78bfa'},
+      {id:4,title:'Audio',x:1850,y:1130,w:620,h:220,color:'#34d399'}
     ],
     nodes:[
-      {id:1,type:'PC',iconKey:'pc',size:'large',name:'Main PC',model:'Custom Build',note:'Gaming / Workstation',x:1500,y:1050},
-      {id:2,type:'Monitor',iconKey:'monitor',size:'medium',name:'4K Monitor',model:'32-inch / 144Hz',note:'Main Display',x:1820,y:890},
-      {id:3,type:'USB Hub',iconKey:'usb-hub',size:'medium',name:'USB Hub',model:'USB-C 10Gbps',note:'Desk Hub',x:1820,y:1070},
-      {id:4,type:'DAC',iconKey:'dac',size:'medium',name:'USB DAC',model:'Desktop DAC',note:'Earphone output',x:1820,y:1250},
-      {id:5,type:'Keyboard',iconKey:'keyboard',size:'small',name:'Keyboard',model:'',note:'USB',x:1240,y:950},
-      {id:6,type:'Mouse',iconKey:'mouse',size:'small',name:'Mouse',model:'',note:'Wireless',x:1240,y:1150}
+      {id:1,type:'ONU / Modem',iconKey:'modem',size:'medium',name:'ONU / Modem',model:'',note:'Internet',locked:false,x:730,y:740},
+      {id:2,type:'Router',iconKey:'router',size:'medium',name:'Wi-Fi Router',model:'',note:'Gateway',locked:false,x:990,y:740},
+      {id:3,type:'LAN Switch',iconKey:'lan-switch',size:'medium',name:'LAN Switch',model:'',note:'Wired network',locked:false,x:1240,y:740},
+
+      {id:4,type:'Access Point',iconKey:'access-point',size:'medium',name:'Access Point',model:'',note:'Wi-Fi',locked:false,x:870,y:1050},
+      {id:5,type:'Smartphone',iconKey:'smartphone',size:'small',name:'Smartphone',model:'',note:'Wi-Fi',locked:false,x:1160,y:1060},
+
+      {id:6,type:'PC',iconKey:'pc',size:'large',name:'Main PC',model:'Custom Build',note:'Gaming / Workstation',locked:false,x:1590,y:790},
+      {id:7,type:'Monitor',iconKey:'monitor',size:'medium',name:'Main Monitor',model:'34-inch Ultrawide',note:'',locked:false,x:1870,y:700},
+      {id:8,type:'USB Hub',iconKey:'usb-hub',size:'medium',name:'USB Hub',model:'USB-C',note:'Desk peripherals',locked:false,x:1870,y:900},
+      {id:9,type:'Keyboard',iconKey:'keyboard',size:'small',name:'Keyboard',model:'',note:'USB',locked:false,x:2150,y:860},
+      {id:10,type:'Mouse',iconKey:'mouse',size:'small',name:'Mouse',model:'',note:'USB',locked:false,x:2150,y:960},
+      {id:13,type:'Game Console',iconKey:'game-console',size:'medium',name:'Game Console',model:'',note:'HDMI',locked:false,x:2290,y:700},
+
+      {id:11,type:'DAC',iconKey:'dac',size:'medium',name:'USB DAC',model:'',note:'Desktop audio',locked:false,x:1930,y:1190},
+      {id:12,type:'Speaker',iconKey:'speaker',size:'small',name:'Speaker',model:'',note:'',locked:false,x:2220,y:1200}
     ],
     edges:[
-      {id:'e1',from:1,to:2,type:'DisplayPort',label:'DisplayPort',style:'curve',bend:.5,fromSide:'auto',toSide:'auto'},
-      {id:'e2',from:1,to:3,type:'USB-C',label:'USB-C',style:'curve',bend:.5,fromSide:'auto',toSide:'auto'},
-      {id:'e3',from:3,to:4,type:'USB-A',label:'USB-A',style:'curve',bend:.5,fromSide:'auto',toSide:'auto'},
-      {id:'e4',from:5,to:1,type:'USB-A',label:'USB-A',style:'curve',bend:.5,fromSide:'auto',toSide:'auto'},
-      {id:'e5',from:6,to:1,type:'USB-A',label:'USB Receiver',style:'curve',bend:.5,fromSide:'auto',toSide:'auto'}
+      {id:'e1',from:1,to:2,type:'LAN',label:'WAN',labelPos:.5,style:'straight',bend:.5,fromSide:'right',toSide:'left'},
+      {id:'e2',from:2,to:3,type:'LAN',label:'LAN',labelPos:.5,style:'straight',bend:.5,fromSide:'right',toSide:'left'},
+      {id:'e3',from:3,to:6,type:'LAN',label:'LAN',labelPos:.5,style:'curve',bend:.42,fromSide:'right',toSide:'left'},
+
+      {id:'e4',from:2,to:4,type:'LAN',label:'LAN',labelPos:.55,style:'curve',bend:.35,fromSide:'bottom',toSide:'top'},
+      {id:'e5',from:4,to:5,type:'Wi-Fi',label:'Wi-Fi',labelPos:.5,style:'curve',bend:.4,fromSide:'right',toSide:'left'},
+
+      {id:'e6',from:6,to:7,type:'DisplayPort',label:'DisplayPort',labelPos:.5,style:'curve',bend:.38,fromSide:'right',toSide:'left'},
+      {id:'e7',from:6,to:8,type:'USB-C',label:'USB-C',labelPos:.48,style:'curve',bend:.42,fromSide:'right',toSide:'left'},
+      {id:'e8',from:8,to:9,type:'USB-A',label:'USB',labelPos:.52,style:'curve',bend:.32,fromSide:'right',toSide:'left'},
+      {id:'e9',from:8,to:10,type:'USB-A',label:'USB',labelPos:.55,style:'curve',bend:.32,fromSide:'right',toSide:'left'},
+
+      {id:'e10',from:6,to:11,type:'USB-C',label:'USB',labelPos:.55,style:'curve',bend:.52,fromSide:'bottom',toSide:'left'},
+      {id:'e11',from:11,to:12,type:'RCA',label:'RCA',labelPos:.5,style:'straight',bend:.5,fromSide:'right',toSide:'left'},
+
+      {id:'e12',from:13,to:7,type:'HDMI',label:'HDMI',labelPos:.48,style:'curve',bend:.3,fromSide:'left',toSide:'right'}
     ],
     view:{x:0,y:0,scale:1}
   };
@@ -450,7 +473,7 @@ function loadInitialState(){
   }catch(err){ console.warn(err); }
   firstRun = true;
   applyImportedState(makeSample(), false);
-  requestAnimationFrame(centerWorkspace);
+  requestAnimationFrame(fitAll);
 }
 
 function applyImportedState(data, save=true){
@@ -1920,7 +1943,7 @@ sampleBtn.addEventListener('click',()=>{
   if(!confirm('現在の構成をサンプル構成に置き換えますか？'))return;
   pushUndoSnapshot();
   applyImportedState(makeSample());
-  requestAnimationFrame(()=>{centerWorkspace();scheduleSave()});
+  requestAnimationFrame(()=>{fitAll();scheduleSave()});
 });
 
 function openModal(title,html){
