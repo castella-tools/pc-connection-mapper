@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.31 loaded');
+console.info('PC Connection Mapper app.js v1.32 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -388,7 +388,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.31',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.32',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -422,7 +422,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.31',
+    version:'1.32',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -437,7 +437,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.31',
+    version:'1.32',
     nextId:14,
     nextGroupId:5,
     nextAnnotationId:2,
@@ -726,6 +726,7 @@ function addAnnotation(){
 
 function renderAnnotations(){
   const layer=document.getElementById('annotations');
+  if(!layer)return;
   layer.innerHTML='';
   state.annotations.forEach(annotation=>{
     const el=document.createElement('div');
@@ -734,7 +735,7 @@ function renderAnnotations(){
     el.style.left=`${annotation.x}px`;
     el.style.top=`${annotation.y}px`;
     el.style.fontSize=`${TEXT_SIZES[annotation.size]||TEXT_SIZES.medium}px`;
-    el.textContent=annotation.text;
+    el.textContent=annotation.text || 'Text';
     el.title='ドラッグで移動';
     bindAnnotationDrag(el,annotation);
     layer.appendChild(el);
@@ -836,6 +837,7 @@ function bindGroupInteractions(el,group){
   const selectGroup=()=>{
     state.selectedGroupId=group.id;
     state.selectedEdgeId=null;
+    state.selectedAnnotationId=null;
     clearNodeSelection();
     syncGroupSelectionStyles();
     renderProperties();
@@ -1222,6 +1224,8 @@ function bindNodeDrag(el,node){
     }else{
       state.selectedNodeId=node.id;
       state.selectedEdgeId=null;
+      state.selectedGroupId=null;
+      state.selectedAnnotationId=null;
     }
     syncNodeSelectionStyles();
     renderProperties();
@@ -1511,18 +1515,6 @@ function edgeGeometry(edge){
 
 function renderEdges(){
   linksLayer.innerHTML='';
-  state.annotations.forEach(annotation=>{
-    ctx.save();
-    const fontSize=TEXT_SIZES[annotation.size]||TEXT_SIZES.medium;
-    ctx.fillStyle='#cbd5e1';
-    ctx.font=`500 ${fontSize}px "Segoe UI","Yu Gothic UI","Yu Gothic","Meiryo",Arial,sans-serif`;
-    ctx.textAlign='left';
-    ctx.textBaseline='top';
-    String(annotation.text||'').split(/\n/).forEach((line,i)=>{
-      ctx.fillText(line,annotation.x-bounds.x,annotation.y-bounds.y+i*(fontSize*1.4));
-    });
-    ctx.restore();
-  });
 
   state.edges.forEach(edge=>{
     const geometry=edgeGeometry(edge);
@@ -1537,6 +1529,7 @@ function renderEdges(){
       e.stopPropagation();
       state.selectedEdgeId=edge.id;
       state.selectedGroupId=null;
+      state.selectedAnnotationId=null;
       clearNodeSelection();
       renderAll();
     });
@@ -1560,6 +1553,7 @@ function renderEdges(){
       e.stopPropagation();
       state.selectedEdgeId=edge.id;
       state.selectedGroupId=null;
+      state.selectedAnnotationId=null;
       clearNodeSelection();
       renderAll();
     });
@@ -2607,6 +2601,24 @@ async function renderPng(options){
       ctx.restore();
     });
   }
+
+  state.annotations.forEach(annotation=>{
+    ctx.save();
+    const fontSize=TEXT_SIZES[annotation.size]||TEXT_SIZES.medium;
+    ctx.fillStyle='#cbd5e1';
+    ctx.font=`500 ${fontSize}px "Segoe UI","Yu Gothic UI","Yu Gothic","Meiryo",Arial,sans-serif`;
+    ctx.textAlign='left';
+    ctx.textBaseline='top';
+    const lineHeight=fontSize*1.4;
+    String(annotation.text||'').split(/\n/).forEach((line,i)=>{
+      ctx.fillText(
+        line,
+        annotation.x-bounds.x,
+        annotation.y-bounds.y+i*lineHeight
+      );
+    });
+    ctx.restore();
+  });
 
   state.edges.forEach(edge=>{
     const cable=CABLES[edge.type]||CABLES.Other;
