@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.29 loaded');
+console.info('PC Connection Mapper app.js v1.30 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -366,7 +366,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.29',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.30',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -400,7 +400,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.29',
+    version:'1.30',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -413,7 +413,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.29',
+    version:'1.30',
     nextId:14,
     nextGroupId:5,
     diagram:{title:'Home PC & Network Setup',x:720,y:570},
@@ -519,8 +519,7 @@ function applyImportedState(data, save=true){
   state.selectedGroupId = null;
   state.connectMode = false;
   state.connectSourceId = null;
-  connectBtn.classList.remove('primary');
-  connectBtn.textContent = '機器を接続';
+  syncConnectButton();
   renderAll();
   applyView();
   if(save) scheduleSave();
@@ -1139,17 +1138,77 @@ function bindNodeDrag(el,node){
     clearSmartGuides();
     if(changed){pushUndoSnapshot(before);scheduleSave();}
   });
+
+  el.addEventListener('dblclick',e=>{
+    if(e.button!==0)return;
+    e.preventDefault();
+    e.stopPropagation();
+    startConnectionFromNode(node.id);
+  });
+}
+
+function syncConnectButton(){
+  connectBtn.classList.toggle('primary',state.connectMode);
+  if(!state.connectMode){
+    connectBtn.textContent='機器を接続';
+  }else if(state.connectSourceId!=null){
+    connectBtn.textContent='接続先を選択';
+  }else{
+    connectBtn.textContent='接続元を選択';
+  }
+}
+
+function cancelConnectionMode(showMessage=false){
+  state.connectMode=false;
+  state.connectSourceId=null;
+  syncConnectButton();
+  renderNodes();
+  renderProperties();
+  if(showMessage)showToast('接続モードを終了しました');
+}
+
+function startConnectionFromNode(nodeId){
+  const node=state.nodes.find(n=>n.id===nodeId);
+  if(!node)return;
+  state.connectMode=true;
+  state.connectSourceId=nodeId;
+  state.selectedEdgeId=null;
+  state.selectedGroupId=null;
+  state.selectedNodeId=nodeId;
+  state.selectedNodeIds=[nodeId];
+  syncConnectButton();
+  renderNodes();
+  renderProperties();
+  showToast(`${node.name||node.type} → 接続先を選択`);
+}
+
+function startGenericConnectionMode(){
+  state.connectMode=true;
+  state.connectSourceId=null;
+  state.selectedEdgeId=null;
+  state.selectedGroupId=null;
+  syncConnectButton();
+  renderNodes();
+  renderProperties();
+  showToast('接続元の機器を選択');
 }
 
 function handleConnectNode(nodeId){
   if(state.connectSourceId == null){
     state.connectSourceId = nodeId;
+    const node=state.nodes.find(n=>n.id===nodeId);
+    syncConnectButton();
     renderNodes();
+    renderProperties();
+    showToast(`${node?.name||node?.type||'機器'} → 接続先を選択`);
     return;
   }
   if(state.connectSourceId === nodeId){
     state.connectSourceId = null;
+    syncConnectButton();
     renderNodes();
+    renderProperties();
+    showToast('接続元を選択し直してください');
     return;
   }
   pushUndoSnapshot();
@@ -1672,6 +1731,7 @@ function renderProperties(){
       <label class="form-label">メモ</label>
       <textarea class="form-control" id="nodeNote" rows="2">${escapeHtml(node.note)}</textarea>
     </div>
+    <button class="btn" id="connectNodeBtn" style="width:100%;margin-bottom:8px">この機器から接続</button>
     <div class="action-grid single-actions">
       <button class="btn" id="duplicateNodeBtn">複製</button>
       <button class="btn" id="lockNodeBtn">${node.locked?'固定解除':'固定'}</button>
@@ -1691,6 +1751,7 @@ function renderProperties(){
     const type=DEVICE_TYPES.find(d=>d.type===e.target.value);
     node.type=type.type;node.iconKey=type.iconKey;updateNodeVisual(node);
   });
+  document.getElementById('connectNodeBtn').onclick=()=>startConnectionFromNode(node.id);
   document.getElementById('duplicateNodeBtn').onclick=duplicateSelected;
   document.getElementById('lockNodeBtn').onclick=()=>setSelectedLocked(!node.locked);
   document.getElementById('deleteNodeBtn').addEventListener('click',deleteSelection);
@@ -1900,6 +1961,16 @@ window.addEventListener('keydown',e=>{
   if(mod && !e.shiftKey && e.key.toLowerCase()==='z'){e.preventDefault();undo()}
   else if((mod && e.key.toLowerCase()==='y') || (mod && e.shiftKey && e.key.toLowerCase()==='z')){e.preventDefault();redo()}
   else if(mod&&e.key.toLowerCase()==='d'){e.preventDefault();duplicateSelected()}
+  else if(!mod&&e.key.toLowerCase()==='c'){
+    e.preventDefault();
+    if(state.connectMode){
+      cancelConnectionMode(true);
+    }else if(state.selectedNodeId!=null && (state.selectedNodeIds||[]).length===1){
+      startConnectionFromNode(state.selectedNodeId);
+    }else{
+      startGenericConnectionMode();
+    }
+  }
   else if(mod&&e.key==='0'){e.preventDefault();zoomAtCenter(1)}
   else if(e.key==='Delete'){e.preventDefault();deleteSelection()}
   else if(e.key==='+'||e.key==='='){e.preventDefault();zoomAtCenter(state.view.scale*1.2)}
@@ -1913,14 +1984,13 @@ addGroupBtn.addEventListener('click',addGroup);
 titleBtn.addEventListener('click',showTitleModal);
 
 connectBtn.addEventListener('click',()=>{
-  state.connectMode=!state.connectMode;
-  state.connectSourceId=null;
-  state.selectedEdgeId=null;
-  state.selectedGroupId=null;
-  connectBtn.classList.toggle('primary',state.connectMode);
-  connectBtn.textContent=state.connectMode?'接続モード ON':'機器を接続';
-  renderNodes();
-  renderProperties();
+  if(state.connectMode){
+    cancelConnectionMode();
+  }else if(state.selectedNodeId!=null && (state.selectedNodeIds||[]).length===1){
+    startConnectionFromNode(state.selectedNodeId);
+  }else{
+    startGenericConnectionMode();
+  }
 });
 
 toggleLeftBtn.addEventListener('click',()=>{
@@ -1967,7 +2037,7 @@ function showHelpModal(isFirst=false){
     <p class="welcome-lead">PC・モニター・USB機器・オーディオ・ネットワーク機器などの接続関係を、カードとケーブルで視覚化できます。</p>
     <div class="welcome-grid">
       <div class="welcome-card"><strong>① 機器を追加</strong><p>左のデバイス一覧から追加し、カード全体をドラッグして配置します。</p></div>
-      <div class="welcome-card"><strong>② ケーブルを接続</strong><p>「機器を接続」を押し、接続する2台を順番にクリックします。</p></div>
+      <div class="welcome-card"><strong>② ケーブルを接続</strong><p>カードをダブルクリックすると、その機器からすぐ接続を開始できます。上部の「機器を接続」も利用できます。</p></div>
       <div class="welcome-card"><strong>③ 整えて見やすく</strong><p>スマートガイド・複数選択・整列・グループ枠で、構成を見やすく整理できます。</p></div>
       <div class="welcome-card"><strong>④ タイトル・出力</strong><p>構成図タイトルを付け、JSONでバックアップしたりPNG画像として書き出せます。</p></div>
     </div>
@@ -1976,6 +2046,8 @@ function showHelpModal(isFirst=false){
       <kbd>Ctrl + Y</kbd><span>やり直す</span>
       <kbd>Shift + クリック</kbd><span>機器を複数選択</span>
       <kbd>Ctrl + D</kbd><span>選択中の機器を複製</span>
+      <kbd>C</kbd><span>選択中の機器から接続開始 / 接続モード終了</span>
+      <kbd>ダブルクリック</kbd><span>その機器から接続開始</span>
       <kbd>Delete</kbd><span>選択中の機器・ケーブルを削除</span>
       <kbd>Ctrl + 0</kbd><span>表示倍率を100%へ</span>
       <kbd>Home</kbd><span>全体表示</span>
