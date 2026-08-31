@@ -1,10 +1,38 @@
-console.info('PC Connection Mapper app.js v1.23 loaded');
+console.info('PC Connection Mapper app.js v1.24 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
 const STORAGE_KEY = 'pc-connection-mapper-v1';
 const INTRO_KEY = 'pc-connection-mapper-intro-seen-v1';
 const HISTORY_LIMIT = 50;
+const PALETTE_COLLAPSE_KEY = 'pc-connection-mapper-palette-collapse-v1';
+const PNG_OPTIONS_KEY = 'pc-connection-mapper-png-options-v1';
+
+const DEVICE_SEARCH_ALIASES = {
+  'PC':'パソコン デスクトップ computer',
+  'Laptop':'ノート ノートPC notebook',
+  'Monitor':'モニター ディスプレイ display',
+  'Keyboard':'キーボード',
+  'Mouse':'マウス',
+  'Trackball':'トラックボール',
+  'Controller':'コントローラー ゲームパッド gamepad',
+  'Webcam':'ウェブカメラ web camera',
+  'USB Hub':'USBハブ ハブ',
+  'Dock':'ドック docking',
+  'External Storage':'外付けストレージ 外付けHDD 外付けSSD',
+  'DAC':'DAC オーディオ',
+  'Audio I/F':'オーディオインターフェース audio interface',
+  'Speaker':'スピーカー',
+  'Headphone':'ヘッドホン',
+  'Earphone':'イヤホン',
+  'Microphone':'マイク マイクロフォン',
+  'Router':'ルーター',
+  'LAN Switch':'LANスイッチ スイッチングハブ',
+  'NAS':'NAS ネットワークストレージ',
+  'Printer':'プリンター',
+  'Power / UPS':'電源 UPS',
+  'Other':'その他'
+};
 
 const DEVICE_GROUPS = [
   {
@@ -184,6 +212,8 @@ const groupsLayer = document.getElementById('groups');
 const guidesLayer = document.getElementById('guides');
 const diagramTitleLayer = document.getElementById('diagramTitleLayer');
 const palette = document.getElementById('palette');
+const deviceSearch = document.getElementById('deviceSearch');
+const clearDeviceSearchBtn = document.getElementById('clearDeviceSearchBtn');
 const properties = document.getElementById('properties');
 const snapToggle = document.getElementById('snapToggle');
 const saveStatus = document.getElementById('saveStatus');
@@ -304,7 +334,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.23',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.24',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -340,7 +370,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.23',
+    version:'1.24',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -353,7 +383,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.23',
+    version:'1.24',
     nextId:7,
     nextGroupId:3,
     diagram:{title:'My Desktop Setup',x:1240,y:770},
@@ -443,22 +473,80 @@ function applyImportedState(data, save=true){
   if(save) scheduleSave();
 }
 
-function buildPalette(){
-  palette.innerHTML = '';
+function loadCollapsedDeviceGroups(){
+  try{
+    const parsed=JSON.parse(localStorage.getItem(PALETTE_COLLAPSE_KEY)||'[]');
+    return new Set(Array.isArray(parsed)?parsed:[]);
+  }catch{
+    return new Set();
+  }
+}
+
+const collapsedDeviceGroups=loadCollapsedDeviceGroups();
+
+function saveCollapsedDeviceGroups(){
+  localStorage.setItem(PALETTE_COLLAPSE_KEY,JSON.stringify([...collapsedDeviceGroups]));
+}
+
+function normalizedDeviceSearch(value){
+  return String(value||'').trim().toLowerCase();
+}
+
+function deviceMatchesSearch(type,groupLabel,query){
+  if(!query)return true;
+  const haystack=[
+    type,
+    groupLabel,
+    DEVICE_SEARCH_ALIASES[type]||''
+  ].join(' ').toLowerCase();
+  return haystack.includes(query);
+}
+
+function buildPalette(filterValue=deviceSearch?.value||''){
+  const query=normalizedDeviceSearch(filterValue);
+  palette.innerHTML='';
+  let resultCount=0;
+
   DEVICE_GROUPS.forEach(group=>{
+    const categoryMatched=query && group.label.toLowerCase().includes(query);
+    const matchingItems=categoryMatched
+      ? group.items
+      : group.items.filter(([type])=>deviceMatchesSearch(type,group.label,query));
+
+    if(query && matchingItems.length===0)return;
+    resultCount+=matchingItems.length;
+
     const section=document.createElement('section');
     section.className='device-group';
     section.style.setProperty('--cat-color',DEVICE_CATEGORY_ACCENTS[group.label]||'#94a3b8');
 
-    const heading=document.createElement('div');
-    heading.className='device-group-title';
-    heading.textContent=group.label;
+    const collapsed=!query && collapsedDeviceGroups.has(group.label);
+
+    const heading=document.createElement('button');
+    heading.type='button';
+    heading.className='device-group-title device-group-toggle'+(collapsed?' collapsed':'');
+    heading.setAttribute('aria-expanded',String(!collapsed));
+    heading.innerHTML=`
+      <span class="device-group-heading">
+        <span class="device-group-chevron" aria-hidden="true">⌄</span>
+        <span>${escapeHtml(group.label)}</span>
+      </span>
+      <span class="device-group-count">${matchingItems.length}</span>
+    `;
+    heading.addEventListener('click',()=>{
+      if(query)return;
+      if(collapsedDeviceGroups.has(group.label))collapsedDeviceGroups.delete(group.label);
+      else collapsedDeviceGroups.add(group.label);
+      saveCollapsedDeviceGroups();
+      buildPalette();
+    });
     section.appendChild(heading);
 
     const grid=document.createElement('div');
     grid.className='device-group-grid';
+    grid.hidden=collapsed;
 
-    group.items.forEach(([type,iconKey,size])=>{
+    matchingItems.forEach(([type,iconKey,size])=>{
       const button=document.createElement('button');
       button.className='palette-btn';
       button.style.setProperty('--cat-color',deviceAccent(type));
@@ -470,7 +558,31 @@ function buildPalette(){
     section.appendChild(grid);
     palette.appendChild(section);
   });
+
+  if(query && resultCount===0){
+    const empty=document.createElement('div');
+    empty.className='palette-empty';
+    empty.innerHTML=`<strong>一致するデバイスがありません</strong><span>「${escapeHtml(filterValue)}」の検索結果は0件です。</span>`;
+    palette.appendChild(empty);
+  }
+
+  if(clearDeviceSearchBtn){
+    clearDeviceSearchBtn.hidden=!query;
+  }
 }
+
+deviceSearch?.addEventListener('input',()=>buildPalette());
+deviceSearch?.addEventListener('keydown',e=>{
+  if(e.key==='Escape' && deviceSearch.value){
+    deviceSearch.value='';
+    buildPalette();
+  }
+});
+clearDeviceSearchBtn?.addEventListener('click',()=>{
+  deviceSearch.value='';
+  buildPalette();
+  deviceSearch.focus();
+});
 
 function addNode(device){
   pushUndoSnapshot();
@@ -1904,15 +2016,27 @@ jsonFileInput.addEventListener('change',async()=>{
   }
 });
 
-function contentBounds(){
-  const b=layoutBoundsRaw(true);
-  if(!b)return{x:0,y:0,w:WORKSPACE.width,h:WORKSPACE.height};
-  const pad=120;
-  return{
-    x:Math.max(0,b.x-pad),y:Math.max(0,b.y-pad),
-    w:Math.min(WORKSPACE.width,b.maxX+pad)-Math.max(0,b.x-pad),
-    h:Math.min(WORKSPACE.height,b.maxY+pad)-Math.max(0,b.y-pad)
+function contentBounds(includeGroups=true){
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  const include=(x,y,w,h)=>{
+    minX=Math.min(minX,x);minY=Math.min(minY,y);
+    maxX=Math.max(maxX,x+w);maxY=Math.max(maxY,y+h);
   };
+
+  if(includeGroups)state.groups.forEach(g=>include(g.x,g.y,g.w,g.h));
+  state.nodes.forEach(n=>{
+    const s=cardSize(n);
+    include(n.x,n.y,s.w,s.h);
+  });
+  const titleBounds=diagramTitleBounds();
+  if(titleBounds)include(titleBounds.x,titleBounds.y,titleBounds.w,titleBounds.h);
+
+  if(minX===Infinity)return{x:0,y:0,w:WORKSPACE.width,h:WORKSPACE.height};
+
+  const pad=120;
+  const x=Math.max(0,minX-pad),y=Math.max(0,minY-pad);
+  const right=Math.min(WORKSPACE.width,maxX+pad),bottom=Math.min(WORKSPACE.height,maxY+pad);
+  return{x,y,w:right-x,h:bottom-y};
 }
 
 function hexToRgba(hex,alpha){
@@ -2049,42 +2173,80 @@ function drawEdgeCanvas(ctx,edge,offsetX,offsetY){
   return{x:lp.x-offsetX,y:lp.y-offsetY-9};
 }
 
-pngBtn.addEventListener('click',async()=>{
+function loadPngOptions(){
+  const defaults={grid:true,groups:true,background:'dark',scale:2};
   try{
-    const bounds=contentBounds();
-    const scale=2;
-    const canvas=document.createElement('canvas');
-    canvas.width=Math.ceil(bounds.w*scale);
-    canvas.height=Math.ceil(bounds.h*scale);
-    const ctx=canvas.getContext('2d');
-    ctx.scale(scale,scale);
-    const pngIcons=await preparePngDeviceIcons();
+    const saved=JSON.parse(localStorage.getItem(PNG_OPTIONS_KEY)||'{}');
+    return{
+      grid:saved.grid!==false,
+      groups:saved.groups!==false,
+      background:saved.background==='transparent'?'transparent':'dark',
+      scale:[1,2,4].includes(+saved.scale)?+saved.scale:2
+    };
+  }catch{
+    return defaults;
+  }
+}
 
+function savePngOptions(options){
+  localStorage.setItem(PNG_OPTIONS_KEY,JSON.stringify(options));
+}
+
+async function renderPng(options){
+  const bounds=contentBounds(options.groups);
+  const scale=options.scale;
+  const width=Math.ceil(bounds.w*scale);
+  const height=Math.ceil(bounds.h*scale);
+  const totalPixels=width*height;
+
+  if(totalPixels>80000000){
+    throw new Error(`画像サイズが大きすぎます（${width}×${height}px）。解像度を下げてください。`);
+  }
+
+  const canvas=document.createElement('canvas');
+  canvas.width=width;
+  canvas.height=height;
+  const ctx=canvas.getContext('2d');
+  ctx.scale(scale,scale);
+  const pngIcons=await preparePngDeviceIcons();
+
+  if(options.background==='dark'){
     ctx.fillStyle='#0f131b';
     ctx.fillRect(0,0,bounds.w,bounds.h);
+  }else{
+    ctx.clearRect(0,0,bounds.w,bounds.h);
+  }
 
+  if(options.grid){
     ctx.lineWidth=1;
     for(let x=Math.floor(bounds.x/20)*20;x<=bounds.x+bounds.w;x+=20){
       const xx=x-bounds.x+.5;
       ctx.beginPath();ctx.moveTo(xx,0);ctx.lineTo(xx,bounds.h);
-      ctx.strokeStyle=x%100===0?'#222936':'#171d27';ctx.stroke();
+      ctx.strokeStyle=x%100===0
+        ? (options.background==='transparent'?'rgba(100,116,139,.34)':'#222936')
+        : (options.background==='transparent'?'rgba(100,116,139,.18)':'#171d27');
+      ctx.stroke();
     }
     for(let y=Math.floor(bounds.y/20)*20;y<=bounds.y+bounds.h;y+=20){
       const yy=y-bounds.y+.5;
       ctx.beginPath();ctx.moveTo(0,yy);ctx.lineTo(bounds.w,yy);
-      ctx.strokeStyle=y%100===0?'#222936':'#171d27';ctx.stroke();
+      ctx.strokeStyle=y%100===0
+        ? (options.background==='transparent'?'rgba(100,116,139,.34)':'#222936')
+        : (options.background==='transparent'?'rgba(100,116,139,.18)':'#171d27');
+      ctx.stroke();
     }
+  }
 
+  if((state.diagram?.title||'').trim()){
+    ctx.save();
+    ctx.fillStyle=options.background==='transparent'?'#172033':'#f1f5f9';
+    ctx.font='700 24px "Segoe UI","Yu Gothic UI","Yu Gothic","Meiryo",Arial,sans-serif';
+    ctx.textAlign='left';
+    ctx.fillText(state.diagram.title,state.diagram.x-bounds.x,state.diagram.y-bounds.y+30);
+    ctx.restore();
+  }
 
-    if((state.diagram?.title||'').trim()){
-      ctx.save();
-      ctx.fillStyle='#f1f5f9';
-      ctx.font='700 24px "Segoe UI",Arial,sans-serif';
-      ctx.textAlign='left';
-      ctx.fillText(state.diagram.title,state.diagram.x-bounds.x,state.diagram.y-bounds.y+30);
-      ctx.restore();
-    }
-
+  if(options.groups){
     state.groups.forEach(group=>{
       const x=group.x-bounds.x,y=group.y-bounds.y;
       ctx.save();
@@ -2095,126 +2257,210 @@ pngBtn.addEventListener('click',async()=>{
       roundRect(ctx,x,y,group.w,group.h,16);ctx.fill();ctx.stroke();
       ctx.setLineDash([]);
       ctx.fillStyle=hexToRgba(group.color,.95);
-      ctx.font='700 11px "Segoe UI",Arial,sans-serif';
+      ctx.font='700 11px "Segoe UI","Yu Gothic UI","Yu Gothic","Meiryo",Arial,sans-serif';
       ctx.fillText(group.title,x+14,y+21);
       ctx.restore();
     });
-
-    state.edges.forEach(edge=>{
-      const cable=CABLES[edge.type]||CABLES.Other;
-      ctx.save();
-      ctx.strokeStyle=cable.color;ctx.lineWidth=3;ctx.lineCap='round';ctx.lineJoin='round';
-      ctx.setLineDash(cable.dash?[8,6]:[]);
-      const labelPoint=drawEdgeCanvas(ctx,edge,bounds.x,bounds.y);
-      ctx.stroke();ctx.restore();
-
-      if(labelPoint){
-        const label=edge.label||edge.type;
-        ctx.save();
-        ctx.font='11px "Segoe UI",Arial,sans-serif';ctx.textAlign='center';
-        const width=ctx.measureText(label).width;
-        ctx.fillStyle='rgba(15,19,27,.92)';
-        ctx.fillRect(labelPoint.x-width/2-4,labelPoint.y-12,width+8,16);
-        ctx.fillStyle='#d7deea';ctx.fillText(label,labelPoint.x,labelPoint.y);
-        ctx.restore();
-      }
-    });
-
-    state.nodes.forEach(node=>{
-      const s=cardSize(node),x=node.x-bounds.x,y=node.y-bounds.y;
-      const accent=deviceAccent(node.type);
-      ctx.save();
-
-      ctx.fillStyle='#1d2430';ctx.strokeStyle='#3b455a';ctx.lineWidth=1;
-      roundRect(ctx,x,y,s.w,s.h,14);ctx.fill();ctx.stroke();
-
-      ctx.fillStyle=accent;
-      ctx.fillRect(x+14,y+1,s.w-28,3);
-
-      // Icon container — mirrors the SVG icon shown on the live card.
-      const iconBoxX=x+10,iconBoxY=y+(node.size==='xlarge'?12:9);
-      ctx.fillStyle='#192131';
-      ctx.strokeStyle='#313d52';
-      ctx.lineWidth=1;
-      roundRect(ctx,iconBoxX,iconBoxY,28,28,8);ctx.fill();ctx.stroke();
-
-      const cacheKey=`${nodeIconKey(node)}|${accent}`;
-      const iconImg=pngIcons.get(cacheKey);
-      if(iconImg) ctx.drawImage(iconImg,iconBoxX+4,iconBoxY+4,20,20);
-
-      // Clip all text to the inside of the card so PNG behaves like the live HTML card.
-      ctx.save();
-      ctx.beginPath();
-      roundRect(ctx,x+1,y+1,s.w-2,s.h-2,13);
-      ctx.clip();
-
-      const textX=x+46;
-      const titleY=y+(node.size==='xlarge'?27:21);
-      const headerRight=x+s.w-10;
-      const headerWidth=Math.max(24,headerRight-textX);
-      const bodyX=x+(node.size==='xlarge'?13:10);
-      const bodyWidth=Math.max(24,s.w-(node.size==='xlarge'?26:20));
-      const uiFont='"Segoe UI","Yu Gothic UI","Yu Gothic","Meiryo",Arial,sans-serif';
-
-      ctx.textAlign='left';
-      ctx.fillStyle='#edf2f7';
-      ctx.font=`700 ${node.size==='xlarge'?15:13}px ${uiFont}`;
-      ctx.fillText(canvasEllipsis(ctx,node.name||node.type,headerWidth),textX,titleY);
-
-      ctx.fillStyle='#909bad';
-      ctx.font=`9px ${uiFont}`;
-      ctx.fillText(canvasEllipsis(ctx,node.type,headerWidth),textX,titleY+13);
-
-      let noteY=y+(node.size==='xlarge'?67:52);
-      if(node.model){
-        ctx.fillStyle='#9cabc0';
-        ctx.font=`${node.size==='xlarge'?11:10}px ${uiFont}`;
-        ctx.fillText(canvasEllipsis(ctx,node.model,headerWidth),textX,titleY+27);
-        noteY=y+(node.size==='xlarge'?82:64);
-      }
-
-      ctx.fillStyle='#aab4c5';
-      ctx.font=`${node.size==='xlarge'?11:9}px ${uiFont}`;
-      const noteLimit=node.size==='xlarge'?6:2;
-      const lineHeight=node.size==='xlarge'?16:12;
-      const availableHeight=Math.max(0,y+s.h-10-noteY);
-      const heightLines=Math.max(0,Math.floor(availableHeight/lineHeight)+1);
-      const effectiveLimit=Math.min(noteLimit,heightLines);
-      const noteLines=canvasWrapLines(ctx,node.note||'',bodyWidth,effectiveLimit);
-      noteLines.forEach((line,i)=>{
-        ctx.fillText(canvasEllipsis(ctx,line,bodyWidth),bodyX,noteY+i*lineHeight);
-      });
-
-      ctx.restore();
-
-      if(node.locked){
-        ctx.font='700 7px "Segoe UI",Arial,sans-serif';
-        const lockText='LOCK';
-        const tw=ctx.measureText(lockText).width;
-        const bx=x+s.w-tw-18,by=y+s.h-18;
-        ctx.fillStyle='#131925';ctx.strokeStyle='#3d4a60';
-        roundRect(ctx,bx,by,tw+10,12,4);ctx.fill();ctx.stroke();
-        ctx.fillStyle='#8ea1bb';ctx.fillText(lockText,bx+5,by+9);
-      }
-
-      ctx.restore();
-    });
-
-    const dataUrl=canvas.toDataURL('image/png');
-    openModal('PNG出力',`
-      <div class="mini-text">構成図の使用範囲だけを自動トリミングして2倍解像度で出力します。</div>
-      <img class="export-preview" id="pngPreview" alt="PNG preview">
-    `);
-    document.getElementById('pngPreview').src=dataUrl;
-    modalDownloadLink.href=dataUrl;
-    modalDownloadLink.download='pc-connection-map.png';
-    modalDownloadLink.textContent='PNGを保存';
-    copyJsonBtn.hidden=true;
-  }catch(err){
-    console.error(err);
-    alert(`PNG出力に失敗しました: ${err.message}`);
   }
-});
+
+  state.edges.forEach(edge=>{
+    const cable=CABLES[edge.type]||CABLES.Other;
+    ctx.save();
+    ctx.strokeStyle=cable.color;ctx.lineWidth=3;ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.setLineDash(cable.dash?[8,6]:[]);
+    const labelPoint=drawEdgeCanvas(ctx,edge,bounds.x,bounds.y);
+    ctx.stroke();ctx.restore();
+
+    if(labelPoint){
+      const label=edge.label||edge.type;
+      ctx.save();
+      ctx.font='11px "Segoe UI","Yu Gothic UI","Yu Gothic","Meiryo",Arial,sans-serif';
+      ctx.textAlign='center';
+      const width=ctx.measureText(label).width;
+      ctx.fillStyle=options.background==='transparent'?'rgba(15,19,27,.82)':'rgba(15,19,27,.92)';
+      ctx.fillRect(labelPoint.x-width/2-4,labelPoint.y-12,width+8,16);
+      ctx.fillStyle='#d7deea';ctx.fillText(label,labelPoint.x,labelPoint.y);
+      ctx.restore();
+    }
+  });
+
+  state.nodes.forEach(node=>{
+    const s=cardSize(node),x=node.x-bounds.x,y=node.y-bounds.y;
+    const accent=deviceAccent(node.type);
+    ctx.save();
+
+    ctx.fillStyle='#1d2430';ctx.strokeStyle='#3b455a';ctx.lineWidth=1;
+    roundRect(ctx,x,y,s.w,s.h,14);ctx.fill();ctx.stroke();
+
+    ctx.fillStyle=accent;
+    ctx.fillRect(x+14,y+1,s.w-28,3);
+
+    const iconBoxX=x+10,iconBoxY=y+(node.size==='xlarge'?12:9);
+    ctx.fillStyle='#192131';
+    ctx.strokeStyle='#313d52';
+    ctx.lineWidth=1;
+    roundRect(ctx,iconBoxX,iconBoxY,28,28,8);ctx.fill();ctx.stroke();
+
+    const cacheKey=`${nodeIconKey(node)}|${accent}`;
+    const iconImg=pngIcons.get(cacheKey);
+    if(iconImg)ctx.drawImage(iconImg,iconBoxX+4,iconBoxY+4,20,20);
+
+    ctx.save();
+    ctx.beginPath();
+    roundRect(ctx,x+1,y+1,s.w-2,s.h-2,13);
+    ctx.clip();
+
+    const textX=x+46;
+    const titleY=y+(node.size==='xlarge'?27:21);
+    const headerRight=x+s.w-10;
+    const headerWidth=Math.max(24,headerRight-textX);
+    const bodyX=x+(node.size==='xlarge'?13:10);
+    const bodyWidth=Math.max(24,s.w-(node.size==='xlarge'?26:20));
+    const uiFont='"Segoe UI","Yu Gothic UI","Yu Gothic","Meiryo",Arial,sans-serif';
+
+    ctx.textAlign='left';
+    ctx.fillStyle='#edf2f7';
+    ctx.font=`700 ${node.size==='xlarge'?15:13}px ${uiFont}`;
+    ctx.fillText(canvasEllipsis(ctx,node.name||node.type,headerWidth),textX,titleY);
+
+    ctx.fillStyle='#909bad';
+    ctx.font=`9px ${uiFont}`;
+    ctx.fillText(canvasEllipsis(ctx,node.type,headerWidth),textX,titleY+13);
+
+    let noteY=y+(node.size==='xlarge'?67:52);
+    if(node.model){
+      ctx.fillStyle='#9cabc0';
+      ctx.font=`${node.size==='xlarge'?11:10}px ${uiFont}`;
+      ctx.fillText(canvasEllipsis(ctx,node.model,headerWidth),textX,titleY+27);
+      noteY=y+(node.size==='xlarge'?82:64);
+    }
+
+    ctx.fillStyle='#aab4c5';
+    ctx.font=`${node.size==='xlarge'?11:9}px ${uiFont}`;
+    const noteLimit=node.size==='xlarge'?6:2;
+    const lineHeight=node.size==='xlarge'?16:12;
+    const availableHeight=Math.max(0,y+s.h-10-noteY);
+    const heightLines=Math.max(0,Math.floor(availableHeight/lineHeight)+1);
+    const effectiveLimit=Math.min(noteLimit,heightLines);
+    const noteLines=canvasWrapLines(ctx,node.note||'',bodyWidth,effectiveLimit);
+    noteLines.forEach((line,i)=>{
+      ctx.fillText(canvasEllipsis(ctx,line,bodyWidth),bodyX,noteY+i*lineHeight);
+    });
+
+    ctx.restore();
+
+    if(node.locked){
+      ctx.font='700 7px "Segoe UI",Arial,sans-serif';
+      const lockText='LOCK';
+      const tw=ctx.measureText(lockText).width;
+      const bx=x+s.w-tw-18,by=y+s.h-18;
+      ctx.fillStyle='#131925';ctx.strokeStyle='#3d4a60';
+      roundRect(ctx,bx,by,tw+10,12,4);ctx.fill();ctx.stroke();
+      ctx.fillStyle='#8ea1bb';ctx.fillText(lockText,bx+5,by+9);
+    }
+    ctx.restore();
+  });
+
+  return{
+    dataUrl:canvas.toDataURL('image/png'),
+    width,
+    height,
+    bounds
+  };
+}
+
+function showPngExportSettings(){
+  const options=loadPngOptions();
+  openModal('PNG出力設定',`
+    <div class="png-settings">
+      <div class="png-setting-section">
+        <div class="png-setting-title">表示</div>
+        <label class="png-option-row">
+          <span><strong>グリッド</strong><small>背景の方眼をPNGにも表示</small></span>
+          <input id="pngGrid" type="checkbox" ${options.grid?'checked':''}>
+        </label>
+        <label class="png-option-row">
+          <span><strong>グループ枠</strong><small>グループ名と囲み枠をPNGにも表示</small></span>
+          <input id="pngGroups" type="checkbox" ${options.groups?'checked':''}>
+        </label>
+      </div>
+
+      <div class="png-setting-section">
+        <div class="png-setting-title">背景</div>
+        <div class="png-radio-grid">
+          <label class="png-radio-card">
+            <input type="radio" name="pngBackground" value="dark" ${options.background==='dark'?'checked':''}>
+            <span><strong>ダーク</strong><small>画面と同じ背景</small></span>
+          </label>
+          <label class="png-radio-card">
+            <input type="radio" name="pngBackground" value="transparent" ${options.background==='transparent'?'checked':''}>
+            <span><strong>透明</strong><small>資料への貼り付け向け</small></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="png-setting-section">
+        <div class="png-setting-title">解像度</div>
+        <div class="png-scale-options">
+          ${[1,2,4].map(scale=>`
+            <label class="png-scale-card">
+              <input type="radio" name="pngScale" value="${scale}" ${options.scale===scale?'checked':''}>
+              <span><strong>${scale}x</strong><small>${scale===1?'軽量':scale===2?'標準・おすすめ':'高解像度'}</small></span>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="png-generate-row">
+        <button class="btn primary" id="generatePngBtn">プレビューを生成</button>
+        <span class="mini-text" id="pngOutputInfo"></span>
+      </div>
+      <div id="pngPreviewArea"></div>
+    </div>
+  `);
+
+  modalDownloadLink.style.display='none';
+  copyJsonBtn.hidden=true;
+
+  const generateBtn=document.getElementById('generatePngBtn');
+  const previewArea=document.getElementById('pngPreviewArea');
+  const info=document.getElementById('pngOutputInfo');
+
+  generateBtn.addEventListener('click',async()=>{
+    const current={
+      grid:document.getElementById('pngGrid').checked,
+      groups:document.getElementById('pngGroups').checked,
+      background:document.querySelector('input[name="pngBackground"]:checked')?.value||'dark',
+      scale:+document.querySelector('input[name="pngScale"]:checked')?.value||2
+    };
+    savePngOptions(current);
+
+    generateBtn.disabled=true;
+    generateBtn.textContent='生成中…';
+    info.textContent='';
+    previewArea.innerHTML='<div class="png-preview-loading">PNGを生成しています…</div>';
+    modalDownloadLink.style.display='none';
+
+    try{
+      const result=await renderPng(current);
+      previewArea.innerHTML=`<div class="png-preview-shell ${current.background==='transparent'?'transparent':''}"><img class="export-preview" id="pngPreview" alt="PNG preview"></div>`;
+      document.getElementById('pngPreview').src=result.dataUrl;
+      info.textContent=`${result.width.toLocaleString()} × ${result.height.toLocaleString()} px`;
+      modalDownloadLink.href=result.dataUrl;
+      modalDownloadLink.download='pc-connection-map.png';
+      modalDownloadLink.textContent='PNGを保存';
+      modalDownloadLink.style.display='inline-flex';
+    }catch(err){
+      console.error(err);
+      previewArea.innerHTML=`<div class="png-export-error">${escapeHtml(err.message)}</div>`;
+    }finally{
+      generateBtn.disabled=false;
+      generateBtn.textContent='プレビューを生成';
+    }
+  });
+}
+
+pngBtn.addEventListener('click',showPngExportSettings);
 
 snapToggle.addEventListener('change',scheduleSave);
 window.addEventListener('resize',()=>applyView());
