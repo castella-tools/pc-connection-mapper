@@ -604,3 +604,40 @@ textarea.form-control{resize:vertical;min-height:62px;line-height:1.4}
 
 /* PNG export is intentionally dark-background only from v1.25. */
 .png-preview-shell.transparent{background:#0f131b;background-image:none}
+
+
+/* v1.31 — free text annotations */
+.annotations-layer{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  pointer-events:none;
+  z-index:7;
+}
+.annotation-text{
+  position:absolute;
+  pointer-events:auto;
+  cursor:grab;
+  touch-action:none;
+  max-width:700px;
+  padding:3px 5px;
+  border:1px solid transparent;
+  border-radius:5px;
+  color:#cbd5e1;
+  font-weight:500;
+  line-height:1.4;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+  user-select:none;
+}
+.annotation-text:hover{
+  background:rgba(30,41,59,.48);
+  border-color:rgba(100,116,139,.3);
+}
+.annotation-text.selected{
+  background:rgba(30,41,59,.72);
+  border-color:#647ff2;
+  box-shadow:0 0 0 1px rgba(100,127,242,.15);
+}
+.annotation-text:active{cursor:grabbing}

@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.30 loaded');
+console.info('PC Connection Mapper app.js v1.31 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -38,7 +38,8 @@ const DEVICE_SEARCH_ALIASES = {
   'Power / UPS':'電源 UPS',
   'Power Strip':'電源タップ タップ power strip',
   'Printer':'プリンター',
-  'Other':'その他'
+  'Other':'その他',
+  'Text':'テキスト 文字 注釈 annotation label'
 };
 
 const DEVICE_GROUPS = [
@@ -109,7 +110,8 @@ const DEVICE_GROUPS = [
     label:'その他',
     items:[
       ['Printer','printer','medium'],
-      ['Other','other','small']
+      ['Other','other','small'],
+      ['Text','text','small']
     ]
   }
 ];
@@ -138,6 +140,20 @@ function deviceCategoryInfo(type){
 function deviceAccent(type){
   return deviceCategoryInfo(type).color;
 }
+
+const TITLE_SIZES = {
+  small:18,
+  medium:24,
+  large:32,
+  xlarge:42
+};
+
+const TEXT_SIZES = {
+  small:11,
+  medium:14,
+  large:18,
+  xlarge:24
+};
 
 const GROUP_ACCENTS = [
   '#64748b','#60a5fa','#a78bfa','#34d399','#fb923c','#f472b6'
@@ -173,6 +189,7 @@ const ICON_SVGS = {
   modem:'<rect x="4" y="6" width="16" height="12" rx="3"/><path d="M8 10h.01M11 10h.01M14 10h.01M8 14h8"/><path d="M12 3v3"/>',
   'access-point':'<rect x="6" y="9" width="12" height="9" rx="2"/><path d="M12 18v3"/><path d="M8 7c1.1-1.1 2.4-1.6 4-1.6S14.9 5.9 16 7M5 4c1.9-1.8 4.2-2.7 7-2.7S17.1 2.2 19 4"/>',
   'power-strip':'<rect x="3" y="7" width="18" height="10" rx="3"/><circle cx="8" cy="12" r="1.6"/><circle cx="13" cy="12" r="1.6"/><path d="M18 10v4M21 12h2"/>',
+  text:'<path d="M5 6V4h14v2M12 4v16M8 20h8"/>',
   other:'<rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 9h6v6H9z"/>'
 };
 
@@ -284,16 +301,19 @@ let state = {
   nodes: [],
   edges: [],
   groups: [],
-  diagram:{title:'',x:1450,y:900},
+  annotations: [],
+  diagram:{title:'',size:'medium',x:1450,y:900},
   view: {x:0,y:0,scale:1},
   selectedNodeId:null,
   selectedNodeIds:[],
   selectedEdgeId:null,
   selectedGroupId:null,
+  selectedAnnotationId:null,
   connectMode:false,
   connectSourceId:null,
   nextId:1,
-  nextGroupId:1
+  nextGroupId:1,
+  nextAnnotationId:1
 };
 
 let saveTimer = null;
@@ -305,7 +325,7 @@ const editSnapshots = new WeakMap();
 
 
 function contentSnapshot(){
-  return JSON.stringify({nodes:state.nodes,edges:state.edges,groups:state.groups,diagram:state.diagram,nextId:state.nextId,nextGroupId:state.nextGroupId});
+  return JSON.stringify({nodes:state.nodes,edges:state.edges,groups:state.groups,annotations:state.annotations,diagram:state.diagram,nextId:state.nextId,nextGroupId:state.nextGroupId,nextAnnotationId:state.nextAnnotationId});
 }
 
 function pushUndoSnapshot(snapshot=contentSnapshot()){
@@ -326,10 +346,12 @@ function restoreContentSnapshot(snapshot){
   state.nodes=data.nodes||[];
   state.edges=data.edges||[];
   state.groups=data.groups||[];
-  state.diagram=data.diagram||{title:'',x:1450,y:900};
+  state.annotations=data.annotations||[];
+  state.diagram={title:'',size:'medium',x:1450,y:900,...(data.diagram||{})};
   state.nextId=data.nextId||Math.max(0,...state.nodes.map(n=>Number(n.id)||0))+1;
   state.nextGroupId=data.nextGroupId||Math.max(0,...state.groups.map(g=>Number(g.id)||0))+1;
-  state.selectedNodeId=null;state.selectedNodeIds=[];state.selectedEdgeId=null;state.selectedGroupId=null;state.connectMode=false;state.connectSourceId=null;
+  state.nextAnnotationId=data.nextAnnotationId||Math.max(0,...state.annotations.map(a=>Number(a.id)||0))+1;
+  state.selectedNodeId=null;state.selectedNodeIds=[];state.selectedEdgeId=null;state.selectedGroupId=null;state.selectedAnnotationId=null;state.connectMode=false;state.connectSourceId=null;
   connectBtn.classList.remove('primary');connectBtn.textContent='機器を接続';
   renderAll();scheduleSave();
 }
@@ -366,7 +388,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.30',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.31',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -400,23 +422,29 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.30',
+    version:'1.31',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
+    annotations:state.annotations,
     diagram:state.diagram,
     view:state.view,
     nextId:state.nextId,
-    nextGroupId:state.nextGroupId
+    nextGroupId:state.nextGroupId,
+    nextAnnotationId:state.nextAnnotationId
   };
 }
 
 function makeSample(){
   return {
-    version:'1.30',
+    version:'1.31',
     nextId:14,
     nextGroupId:5,
-    diagram:{title:'Home PC & Network Setup',x:720,y:570},
+    nextAnnotationId:2,
+    diagram:{title:'Home PC & Network Setup',size:'medium',x:720,y:570},
+    annotations:[
+      {id:1,text:'Internet → LAN → PC / Wi-Fi',size:'small',x:720,y:620}
+    ],
     groups:[
       {id:1,title:'Network',x:680,y:680,w:790,h:220,color:'#fb923c'},
       {id:2,title:'Desk / Main PC',x:1530,y:650,w:1030,h:430,color:'#60a5fa'},
@@ -503,8 +531,16 @@ function applyImportedState(data, save=true){
     h:Math.max(140,Number.isFinite(+g.h)?+g.h:340),
     color:g.color || GROUP_ACCENTS[0]
   })) : [];
+  state.annotations = Array.isArray(data.annotations) ? data.annotations.map((a,i)=>({
+    id:a.id ?? i+1,
+    text:a.text || 'Text',
+    size:TEXT_SIZES[a.size]?a.size:'medium',
+    x:Number.isFinite(+a.x)?+a.x:1450,
+    y:Number.isFinite(+a.y)?+a.y:900
+  })) : [];
   state.diagram = {
     title:data.diagram?.title || '',
+    size:TITLE_SIZES[data.diagram?.size]?data.diagram.size:'medium',
     x:Number.isFinite(+data.diagram?.x)?+data.diagram.x:1450,
     y:Number.isFinite(+data.diagram?.y)?+data.diagram.y:900
   };
@@ -513,10 +549,12 @@ function applyImportedState(data, save=true){
     : {x:0,y:0,scale:1};
   state.nextId = data.nextId || Math.max(0,...state.nodes.map(n=>Number(n.id)||0))+1;
   state.nextGroupId = data.nextGroupId || Math.max(0,...state.groups.map(g=>Number(g.id)||0))+1;
+  state.nextAnnotationId = data.nextAnnotationId || Math.max(0,...state.annotations.map(a=>Number(a.id)||0))+1;
   state.selectedNodeId = null;
   state.selectedNodeIds = [];
   state.selectedEdgeId = null;
   state.selectedGroupId = null;
+  state.selectedAnnotationId = null;
   state.connectMode = false;
   state.connectSourceId = null;
   syncConnectButton();
@@ -637,6 +675,10 @@ clearDeviceSearchBtn?.addEventListener('click',()=>{
 });
 
 function addNode(device){
+  if(device.type==='Text'){
+    addAnnotation();
+    return;
+  }
   pushUndoSnapshot();
   const center = screenToWorld(viewport.clientWidth/2 + viewport.getBoundingClientRect().left,
                                viewport.clientHeight/2 + viewport.getBoundingClientRect().top);
@@ -661,6 +703,85 @@ function addNode(device){
 }
 
 
+function addAnnotation(){
+  pushUndoSnapshot();
+  const r=viewport.getBoundingClientRect();
+  const center=screenToWorld(r.left+r.width/2,r.top+r.height/2);
+  const annotation={
+    id:state.nextAnnotationId++,
+    text:'Text',
+    size:'medium',
+    x:snap(Math.max(0,Math.min(WORKSPACE.width-200,center.x-60))),
+    y:snap(Math.max(0,Math.min(WORKSPACE.height-40,center.y)))
+  };
+  state.annotations.push(annotation);
+  state.selectedAnnotationId=annotation.id;
+  state.selectedGroupId=null;
+  state.selectedEdgeId=null;
+  clearNodeSelection();
+  renderAll();
+  scheduleSave();
+  requestAnimationFrame(()=>document.getElementById('annotationText')?.select());
+}
+
+function renderAnnotations(){
+  const layer=document.getElementById('annotations');
+  layer.innerHTML='';
+  state.annotations.forEach(annotation=>{
+    const el=document.createElement('div');
+    el.className='annotation-text'+(state.selectedAnnotationId===annotation.id?' selected':'');
+    el.dataset.id=annotation.id;
+    el.style.left=`${annotation.x}px`;
+    el.style.top=`${annotation.y}px`;
+    el.style.fontSize=`${TEXT_SIZES[annotation.size]||TEXT_SIZES.medium}px`;
+    el.textContent=annotation.text;
+    el.title='ドラッグで移動';
+    bindAnnotationDrag(el,annotation);
+    layer.appendChild(el);
+  });
+}
+
+function bindAnnotationDrag(el,annotation){
+  let drag=null;
+  el.addEventListener('pointerdown',e=>{
+    if(e.button!==0)return;
+    e.preventDefault();e.stopPropagation();
+    state.selectedAnnotationId=annotation.id;
+    state.selectedGroupId=null;
+    state.selectedEdgeId=null;
+    clearNodeSelection();
+    renderProperties();
+    document.querySelectorAll('.annotation-text').forEach(node=>node.classList.toggle('selected',Number(node.dataset.id)===annotation.id));
+
+    drag={id:e.pointerId,sx:e.clientX,sy:e.clientY,x:annotation.x,y:annotation.y,before:contentSnapshot(),moved:false};
+    el.setPointerCapture(e.pointerId);
+  });
+  el.addEventListener('pointermove',e=>{
+    if(!drag||drag.id!==e.pointerId)return;
+    const dx=(e.clientX-drag.sx)/state.view.scale;
+    const dy=(e.clientY-drag.sy)/state.view.scale;
+    if(Math.abs(dx)+Math.abs(dy)>3)drag.moved=true;
+    annotation.x=Math.max(0,Math.min(WORKSPACE.width-60,snap(drag.x+dx)));
+    annotation.y=Math.max(0,Math.min(WORKSPACE.height-30,snap(drag.y+dy)));
+    el.style.left=`${annotation.x}px`;
+    el.style.top=`${annotation.y}px`;
+  });
+  el.addEventListener('pointerup',e=>{
+    if(!drag||drag.id!==e.pointerId)return;
+    const d=drag;drag=null;
+    try{if(el.hasPointerCapture(e.pointerId))el.releasePointerCapture(e.pointerId)}catch{}
+    if(d.moved){pushUndoSnapshot(d.before);scheduleSave();}
+  });
+}
+
+function deleteSelectedAnnotation(){
+  if(state.selectedAnnotationId==null)return;
+  pushUndoSnapshot();
+  state.annotations=state.annotations.filter(a=>a.id!==state.selectedAnnotationId);
+  state.selectedAnnotationId=null;
+  renderAll();scheduleSave();showToast('テキストを削除しました');
+}
+
 function addGroup(){
   pushUndoSnapshot();
   const r=viewport.getBoundingClientRect();
@@ -675,6 +796,7 @@ function addGroup(){
   };
   state.groups.push(group);
   state.selectedGroupId=group.id;
+  state.selectedAnnotationId=null;
   state.selectedEdgeId=null;
   clearNodeSelection();
   renderAll();scheduleSave();
@@ -822,8 +944,9 @@ function deleteSelectedGroup(){
 function diagramTitleBounds(){
   const title=(state.diagram?.title||'').trim();
   if(!title)return null;
-  const w=Math.max(220,Math.min(1200,title.length*24+36));
-  return{x:state.diagram.x,y:state.diagram.y,w,h:46};
+  const fontSize=TITLE_SIZES[state.diagram.size]||TITLE_SIZES.medium;
+  const w=Math.max(180,Math.min(1400,title.length*(fontSize*.72)+36));
+  return{x:state.diagram.x,y:state.diagram.y,w,h:fontSize+22};
 }
 
 function renderDiagramTitle(){
@@ -834,6 +957,7 @@ function renderDiagramTitle(){
   el.className='diagram-title-card';
   el.style.left=`${state.diagram.x}px`;
   el.style.top=`${state.diagram.y}px`;
+  el.style.fontSize=`${TITLE_SIZES[state.diagram.size]||TITLE_SIZES.medium}px`;
   el.textContent=title;
   el.title='ドラッグで移動 / ダブルクリックで編集';
   diagramTitleLayer.appendChild(el);
@@ -869,6 +993,11 @@ function layoutBoundsRaw(includeTitle=true){
     maxX=Math.max(maxX,x+w);maxY=Math.max(maxY,y+h);
   };
   state.groups.forEach(g=>include(g.x,g.y,g.w,g.h));
+  state.annotations.forEach(a=>{
+    const fontSize=TEXT_SIZES[a.size]||TEXT_SIZES.medium;
+    const width=Math.max(40,String(a.text||'').length*fontSize*.62);
+    include(a.x,a.y,width,fontSize+12);
+  });
   state.nodes.forEach(n=>{const s=cardSize(n);include(n.x,n.y,s.w,s.h);});
   if(includeTitle){
     const t=diagramTitleBounds();
@@ -884,6 +1013,10 @@ function showTitleModal(){
     <div class="mini-text">タイトルはキャンバス上に表示され、PNG出力にも含まれます。タイトル自体をドラッグして位置を変更できます。</div>
     <label class="form-label">タイトル</label>
     <input class="form-control" id="diagramTitleInput" maxlength="60" value="${escapeHtml(current)}" placeholder="例：My Desktop Setup">
+    <label class="form-label">サイズ</label>
+    <select class="form-control" id="diagramTitleSize">
+      ${optionList(['small','medium','large','xlarge'],state.diagram.size||'medium',{small:'小',medium:'中',large:'大',xlarge:'特大'})}
+    </select>
     <div class="welcome-actions">
       <button class="btn primary" id="saveDiagramTitleBtn">反映</button>
       <button class="btn" id="clearDiagramTitleBtn">タイトルを消す</button>
@@ -910,6 +1043,7 @@ function showTitleModal(){
       }
     }
     state.diagram.title=value;
+    state.diagram.size=document.getElementById('diagramTitleSize').value;
     if(before!==contentSnapshot())pushUndoSnapshot(before);
     renderDiagramTitle();scheduleSave();closeModal();
   };
@@ -979,6 +1113,7 @@ function smartGuideCorrection(positions,dx,dy){
 function renderAll(){
   renderGroups();
   renderEdges();
+  renderAnnotations();
   renderNodes();
   renderDiagramTitle();
   renderProperties();
@@ -998,6 +1133,7 @@ function setSingleNodeSelection(id){
   state.selectedNodeIds=id==null?[]:[id];
   state.selectedEdgeId=null;
   state.selectedGroupId=null;
+  state.selectedAnnotationId=null;
 }
 
 function clearNodeSelection(){
@@ -1014,6 +1150,7 @@ function toggleNodeSelection(id){
   state.selectedNodeId=ids.includes(id)?id:(ids[ids.length-1]??null);
   state.selectedEdgeId=null;
   state.selectedGroupId=null;
+  state.selectedAnnotationId=null;
 }
 
 function syncNodeSelectionStyles(){
@@ -1174,6 +1311,7 @@ function startConnectionFromNode(nodeId){
   state.connectSourceId=nodeId;
   state.selectedEdgeId=null;
   state.selectedGroupId=null;
+  state.selectedAnnotationId=null;
   state.selectedNodeId=nodeId;
   state.selectedNodeIds=[nodeId];
   syncConnectButton();
@@ -1373,6 +1511,19 @@ function edgeGeometry(edge){
 
 function renderEdges(){
   linksLayer.innerHTML='';
+  state.annotations.forEach(annotation=>{
+    ctx.save();
+    const fontSize=TEXT_SIZES[annotation.size]||TEXT_SIZES.medium;
+    ctx.fillStyle='#cbd5e1';
+    ctx.font=`500 ${fontSize}px "Segoe UI","Yu Gothic UI","Yu Gothic","Meiryo",Arial,sans-serif`;
+    ctx.textAlign='left';
+    ctx.textBaseline='top';
+    String(annotation.text||'').split(/\n/).forEach((line,i)=>{
+      ctx.fillText(line,annotation.x-bounds.x,annotation.y-bounds.y+i*(fontSize*1.4));
+    });
+    ctx.restore();
+  });
+
   state.edges.forEach(edge=>{
     const geometry=edgeGeometry(edge);
     if(!geometry) return;
@@ -1528,6 +1679,38 @@ function alignSelected(mode){
 }
 
 function renderProperties(){
+  const annotation=state.annotations.find(a=>a.id===state.selectedAnnotationId);
+  if(annotation){
+    properties.className='';
+    properties.innerHTML=`
+      <div class="form-section">
+        <h3>テキスト</h3>
+        <label class="form-label">内容</label>
+        <textarea class="form-control" id="annotationText" rows="3">${escapeHtml(annotation.text)}</textarea>
+        <label class="form-label">サイズ</label>
+        <select class="form-control" id="annotationSize">
+          ${optionList(['small','medium','large','xlarge'],annotation.size,{small:'小',medium:'中',large:'大',xlarge:'特大'})}
+        </select>
+        <div class="mini-text" style="margin-top:8px">カードではない自由な注釈テキストです。キャンバス上でドラッグして移動できます。</div>
+      </div>
+      <button class="btn danger" id="deleteAnnotationBtn" style="width:100%">テキスト削除</button>
+    `;
+    const textEl=document.getElementById('annotationText');
+    bindTrackedText(textEl,e=>{
+      annotation.text=e.target.value;
+      renderAnnotations();
+      scheduleSave();
+    });
+    document.getElementById('annotationSize').addEventListener('change',e=>{
+      pushUndoSnapshot();
+      annotation.size=e.target.value;
+      renderAnnotations();
+      scheduleSave();
+    });
+    document.getElementById('deleteAnnotationBtn').onclick=deleteSelectedAnnotation;
+    return;
+  }
+
   const group=state.groups.find(g=>g.id===state.selectedGroupId);
   if(group){
     properties.className='';
@@ -1758,6 +1941,10 @@ function renderProperties(){
 }
 
 function deleteSelection(){
+  if(state.selectedAnnotationId!=null){
+    deleteSelectedAnnotation();
+    return;
+  }
   if(state.selectedGroupId!=null){
     deleteSelectedGroup();
     return;
@@ -1930,11 +2117,13 @@ viewport.addEventListener('pointerup',e=>{
   if(edge){
     state.selectedEdgeId=edge.id;
     state.selectedGroupId=null;
+    state.selectedAnnotationId=null;
     clearNodeSelection();
     renderAll();
   }else{
     state.selectedEdgeId=null;
     state.selectedGroupId=null;
+    state.selectedAnnotationId=null;
     clearNodeSelection();
     renderAll();
   }
@@ -2149,6 +2338,10 @@ function contentBounds(includeGroups=true){
   };
 
   if(includeGroups)state.groups.forEach(g=>include(g.x,g.y,g.w,g.h));
+  state.annotations.forEach(a=>{
+    const fontSize=TEXT_SIZES[a.size]||TEXT_SIZES.medium;
+    include(a.x,a.y,Math.max(40,String(a.text||'').length*fontSize*.62),fontSize+12);
+  });
   state.nodes.forEach(n=>{
     const s=cardSize(n);
     include(n.x,n.y,s.w,s.h);
@@ -2356,9 +2549,10 @@ async function renderPng(options){
   if((state.diagram?.title||'').trim()){
     ctx.save();
     ctx.fillStyle='#f1f5f9';
-    ctx.font='700 24px "Segoe UI","Yu Gothic UI","Yu Gothic","Meiryo",Arial,sans-serif';
+    const titleFontSize=TITLE_SIZES[state.diagram.size]||TITLE_SIZES.medium;
+    ctx.font=`700 ${titleFontSize}px "Segoe UI","Yu Gothic UI","Yu Gothic","Meiryo",Arial,sans-serif`;
     ctx.textAlign='left';
-    ctx.fillText(state.diagram.title,state.diagram.x-bounds.x,state.diagram.y-bounds.y+30);
+    ctx.fillText(state.diagram.title,state.diagram.x-bounds.x,state.diagram.y-bounds.y+titleFontSize+6);
     ctx.restore();
   }
 

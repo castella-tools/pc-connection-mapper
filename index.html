@@ -9,7 +9,7 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
   <link rel="apple-touch-icon" href="./icon-192.png">
-  <link rel="stylesheet" href="./styles.css?v=1.30">
+  <link rel="stylesheet" href="./styles.css?v=1.31">
 </head>
 <body>
   <div id="app" class="app">
@@ -17,7 +17,7 @@
       <div class="brand">
         <span class="brand-mark">⌘</span>
         <span>PC Connection Mapper</span>
-        <span class="version">v1.30</span>
+        <span class="version">v1.31</span>
       </div>
       <div class="top-actions">
         <button class="btn ghost" id="toggleLeftBtn">デバイス</button>
@@ -62,6 +62,7 @@
         <svg id="links" class="links"></svg>
         <div id="groups" class="groups-layer"></div>
         <div id="diagramTitleLayer" class="diagram-title-layer"></div>
+        <div id="annotations" class="annotations-layer"></div>
         <div id="nodes" class="nodes"></div>
         <div id="guides" class="guides-layer"></div>
       </div>
@@ -101,11 +102,11 @@
 
   <div class="toast" id="toast"></div>
 
-  <script type="module" src="./app.js?v=1.30"></script>
+  <script type="module" src="./app.js?v=1.31"></script>
   <script>
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=1.30', { updateViaCache: 'none' }).catch(console.warn);
+        navigator.serviceWorker.register('./sw.js?v=1.31', { updateViaCache: 'none' }).catch(console.warn);
       });
     }
   </script>
