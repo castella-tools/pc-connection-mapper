@@ -272,8 +272,7 @@ textarea.form-control{resize:vertical;min-height:62px;line-height:1.4}
   border:1.5px dashed color-mix(in srgb,var(--group-color) 62%,transparent);
   border-radius:18px;
   background:color-mix(in srgb,var(--group-color) 5%,transparent);
-  pointer-events:auto;
-  cursor:default;
+  pointer-events:none;
 }
 .group-frame.selected{
   border-style:solid;
@@ -322,8 +321,8 @@ textarea.form-control{resize:vertical;min-height:62px;line-height:1.4}
 
 .color-control{height:36px;padding:4px;cursor:pointer}
 
-.group-title-bar{z-index:2}
-.group-resize{z-index:2}
+.group-title-bar{z-index:2;pointer-events:auto}
+.group-resize{z-index:2;pointer-events:auto}
 .group-frame:hover{
   background:color-mix(in srgb,var(--group-color) 8%,transparent);
 }

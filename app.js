@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.22 loaded');
+console.info('PC Connection Mapper app.js v1.23 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -304,7 +304,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.22',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.23',nextId:1,nextGroupId:1,nodes:[],edges:[],groups:[],diagram:{title:'',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -340,7 +340,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.22',
+    version:'1.23',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -353,7 +353,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.22',
+    version:'1.23',
     nextId:7,
     nextGroupId:3,
     diagram:{title:'My Desktop Setup',x:1240,y:770},
@@ -555,9 +555,8 @@ function bindGroupInteractions(el,group){
     renderProperties();
   };
 
-  const beginMove=(e)=>{
+  title.addEventListener('pointerdown',e=>{
     if(e.button!==0)return;
-    if(e.target.closest('.group-resize'))return;
     e.preventDefault();e.stopPropagation();
     selectGroup();
     action={
@@ -568,10 +567,10 @@ function bindGroupInteractions(el,group){
       before:contentSnapshot(),
       moved:false
     };
-    el.setPointerCapture(e.pointerId);
-  };
+    title.setPointerCapture(e.pointerId);
+  });
 
-  const beginResize=(e)=>{
+  handle.addEventListener('pointerdown',e=>{
     if(e.button!==0)return;
     e.preventDefault();e.stopPropagation();
     selectGroup();
@@ -584,12 +583,9 @@ function bindGroupInteractions(el,group){
       moved:false
     };
     handle.setPointerCapture(e.pointerId);
-  };
+  });
 
-  el.addEventListener('pointerdown',beginMove);
-  handle.addEventListener('pointerdown',beginResize);
-
-  el.addEventListener('click',e=>{
+  title.addEventListener('click',e=>{
     e.stopPropagation();
     selectGroup();
   });
@@ -623,11 +619,10 @@ function bindGroupInteractions(el,group){
     if(!action||action.id!==e.pointerId)return;
     const current=action;
     action=null;
-
     try{
-      if(el.hasPointerCapture(e.pointerId))el.releasePointerCapture(e.pointerId);
+      const capturer=current.kind==='resize'?handle:title;
+      if(capturer.hasPointerCapture(e.pointerId))capturer.releasePointerCapture(e.pointerId);
     }catch{}
-
     if(current.moved){
       pushUndoSnapshot(current.before);
       scheduleSave();
@@ -635,9 +630,12 @@ function bindGroupInteractions(el,group){
     renderProperties();
   };
 
-  el.addEventListener('pointermove',move);
-  el.addEventListener('pointerup',up);
-  el.addEventListener('pointercancel',up);
+  title.addEventListener('pointermove',move);
+  title.addEventListener('pointerup',up);
+  title.addEventListener('pointercancel',up);
+  handle.addEventListener('pointermove',move);
+  handle.addEventListener('pointerup',up);
+  handle.addEventListener('pointercancel',up);
 }
 function renderGroupVisual(group){
   const el=groupsLayer.querySelector(`[data-id="${group.id}"]`);
@@ -1057,6 +1055,25 @@ function pointAlongPolyline(points,t){
   return points[points.length-1];
 }
 
+function sideVector(side){
+  if(side==='left')return{x:-1,y:0};
+  if(side==='right')return{x:1,y:0};
+  if(side==='top')return{x:0,y:-1};
+  if(side==='bottom')return{x:0,y:1};
+  return{x:1,y:0};
+}
+
+function curveControlPoints(p1,p2,fromSide,toSide,bend){
+  const v1=sideVector(fromSide),v2=sideVector(toSide);
+  const distance=Math.max(80,Math.hypot(p2.x-p1.x,p2.y-p1.y));
+  const strength=Math.max(.15,Math.min(.85,Number.isFinite(+bend)?+bend:.5));
+  const offset=Math.max(35,distance*(.18+strength*.48));
+  return{
+    c1:{x:p1.x+v1.x*offset,y:p1.y+v1.y*offset},
+    c2:{x:p2.x+v2.x*offset,y:p2.y+v2.y*offset}
+  };
+}
+
 function edgeLabelPoint(edge){
   const a=state.nodes.find(n=>n.id===edge.from);
   const b=state.nodes.find(n=>n.id===edge.to);
@@ -1071,10 +1088,7 @@ function edgeLabelPoint(edge){
   }
 
   if(edge.style==='curve'){
-    const dx=Math.max(50,Math.abs(p2.x-p1.x)*.45);
-    const sign=p2.x>=p1.x?1:-1;
-    const c1={x:p1.x+dx*sign,y:p1.y};
-    const c2={x:p2.x-dx*sign,y:p2.y};
+    const {c1,c2}=curveControlPoints(p1,p2,fromSide,toSide,edge.bend);
     const u=1-t;
     return{
       x:u*u*u*p1.x+3*u*u*t*c1.x+3*u*t*t*c2.x+t*t*t*p2.x,
@@ -1110,10 +1124,9 @@ function edgeGeometry(edge){
   }
 
   if(edge.style==='curve'){
-    const dx=Math.max(50,Math.abs(p2.x-p1.x)*.45);
-    const sign=p2.x>=p1.x?1:-1;
+    const {c1,c2}=curveControlPoints(p1,p2,fromSide,toSide,edge.bend);
     return {
-      d:`M ${p1.x} ${p1.y} C ${p1.x+dx*sign} ${p1.y}, ${p2.x-dx*sign} ${p2.y}, ${p2.x} ${p2.y}`,
+      d:`M ${p1.x} ${p1.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`,
       label:{x:lp.x,y:lp.y-9}
     };
   }
@@ -1312,7 +1325,7 @@ function renderProperties(){
         </div>
         <label class="form-label">アクセント色</label>
         <input class="form-control color-control" id="groupColor" type="color" value="${escapeHtml(group.color)}">
-        <div class="mini-text" style="margin-top:8px">見出し部分をドラッグして移動、右下のハンドルでサイズ変更できます。</div>
+        <div class="mini-text" style="margin-top:8px">見出し部分をクリックして編集、ドラッグして移動できます。枠の内側はカード操作を優先し、右下のハンドルでサイズ変更できます。</div>
       </div>
       <button class="btn danger" id="deleteGroupBtn" style="width:100%">グループ枠を削除</button>
     `;
@@ -1357,8 +1370,10 @@ function renderProperties(){
         <select class="form-control" id="edgeStyle">
           ${optionList(['curve','orthogonal','straight'],edge.style,{curve:'カーブ',orthogonal:'直角',straight:'直線'})}
         </select>
-        <label class="form-label">曲がる位置</label>
-        <input class="form-control" id="edgeBend" type="range" min="15" max="85" value="${Math.round(edge.bend*100)}">
+        <div id="edgeBendWrap">
+          <label class="form-label" id="edgeBendLabel">${edge.style==='curve'?'カーブのふくらみ':'曲がる位置'}</label>
+          <input class="form-control" id="edgeBend" type="range" min="15" max="85" value="${Math.round(edge.bend*100)}">
+        </div>
         <div class="form-grid">
           <div>
             <label class="form-label">接続元</label>
@@ -1395,8 +1410,20 @@ function renderProperties(){
     labelPosEl.addEventListener('change',()=>endTrackedEdit(labelPosEl));
     labelPosEl.addEventListener('blur',()=>endTrackedEdit(labelPosEl));
 
-    document.getElementById('edgeStyle').addEventListener('change',e=>{
-      pushUndoSnapshot();edge.style=e.target.value;renderEdges();scheduleSave();
+    const styleEl=document.getElementById('edgeStyle');
+    const bendWrap=document.getElementById('edgeBendWrap');
+    const bendLabel=document.getElementById('edgeBendLabel');
+    const syncBendUi=()=>{
+      bendWrap.style.display=edge.style==='straight'?'none':'block';
+      bendLabel.textContent=edge.style==='curve'?'カーブのふくらみ':'曲がる位置';
+    };
+    syncBendUi();
+
+    styleEl.addEventListener('change',e=>{
+      pushUndoSnapshot();
+      edge.style=e.target.value;
+      syncBendUi();
+      renderEdges();scheduleSave();
     });
 
     const bendEl=document.getElementById('edgeBend');
@@ -2000,8 +2027,12 @@ function drawEdgeCanvas(ctx,edge,offsetX,offsetY){
   if(edge.style==='straight'){
     ctx.lineTo(x2,y2);
   }else if(edge.style==='curve'){
-    const dx=Math.max(50,Math.abs(x2-x1)*.45),sign=x2>=x1?1:-1;
-    ctx.bezierCurveTo(x1+dx*sign,y1,x2-dx*sign,y2,x2,y2);
+    const cp=curveControlPoints(p1,p2,fs,ts,edge.bend);
+    ctx.bezierCurveTo(
+      cp.c1.x-offsetX,cp.c1.y-offsetY,
+      cp.c2.x-offsetX,cp.c2.y-offsetY,
+      x2,y2
+    );
   }else{
     const horizontal=fs==='left'||fs==='right';
     const bend=Math.max(.15,Math.min(.85,+edge.bend||.5));
