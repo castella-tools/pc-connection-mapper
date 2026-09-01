@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.33 loaded');
+console.info('PC Connection Mapper app.js v1.34 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -282,6 +282,15 @@ const helpBtn = document.getElementById('helpBtn');
 const toggleLeftBtn = document.getElementById('toggleLeftBtn');
 const toggleRightBtn = document.getElementById('toggleRightBtn');
 
+const mobileDevicesBtn = document.getElementById('mobileDevicesBtn');
+const mobileConnectBtn = document.getElementById('mobileConnectBtn');
+const mobileConnectLabel = document.getElementById('mobileConnectLabel');
+const mobileEditBtn = document.getElementById('mobileEditBtn');
+const mobileFitBtn = document.getElementById('mobileFitBtn');
+const mobileDrawerBackdrop = document.getElementById('mobileDrawerBackdrop');
+const mobileLeftCloseBtn = document.getElementById('mobileLeftCloseBtn');
+const mobileRightCloseBtn = document.getElementById('mobileRightCloseBtn');
+
 const viewControls = document.getElementById('viewControls');
 const zoomOutBtn = document.getElementById('zoomOutBtn');
 const zoomInBtn = document.getElementById('zoomInBtn');
@@ -319,10 +328,89 @@ let state = {
 let saveTimer = null;
 let toastTimer = null;
 let panState = null;
+let pinchState = null;
+const touchPointers = new Map();
 let firstRun = false;
 const history = {undo:[],redo:[]};
 const editSnapshots = new WeakMap();
 
+
+const MOBILE_BREAKPOINT = 760;
+
+function isMobileLayout(){
+  return window.matchMedia(`(max-width:${MOBILE_BREAKPOINT}px)`).matches;
+}
+
+function closeMobileDrawers(){
+  app.classList.remove('mobile-left-open','mobile-right-open');
+  mobileDevicesBtn?.classList.remove('active');
+  mobileEditBtn?.classList.remove('active');
+}
+
+function openMobileDrawer(side){
+  if(!isMobileLayout())return;
+  const left=side==='left';
+  app.classList.toggle('mobile-left-open',left && !app.classList.contains('mobile-left-open'));
+  app.classList.toggle('mobile-right-open',!left && !app.classList.contains('mobile-right-open'));
+  mobileDevicesBtn?.classList.toggle('active',app.classList.contains('mobile-left-open'));
+  mobileEditBtn?.classList.toggle('active',app.classList.contains('mobile-right-open'));
+}
+
+function hasEditableSelection(){
+  return state.selectedNodeId!=null ||
+    state.selectedEdgeId!=null ||
+    state.selectedGroupId!=null ||
+    state.selectedAnnotationId!=null;
+}
+
+function syncMobileToolbar(){
+  if(!mobileEditBtn)return;
+  mobileEditBtn.classList.toggle('has-selection',hasEditableSelection());
+  mobileConnectBtn?.classList.toggle('active',state.connectMode);
+  mobileConnectBtn?.setAttribute('aria-pressed',String(state.connectMode));
+  if(mobileConnectLabel){
+    mobileConnectLabel.textContent=state.connectMode
+      ? (state.connectSourceId!=null?'接続先':'接続元')
+      : '接続';
+  }
+}
+
+function beginPinch(){
+  if(touchPointers.size<2)return false;
+  const points=[...touchPointers.values()].slice(0,2);
+  const dx=points[1].x-points[0].x;
+  const dy=points[1].y-points[0].y;
+  const distance=Math.max(1,Math.hypot(dx,dy));
+  const r=viewport.getBoundingClientRect();
+  const mx=(points[0].x+points[1].x)/2-r.left;
+  const my=(points[0].y+points[1].y)/2-r.top;
+  pinchState={
+    distance,
+    scale:state.view.scale,
+    worldX:(mx-state.view.x)/state.view.scale,
+    worldY:(my-state.view.y)/state.view.scale
+  };
+  panState=null;
+  viewport.classList.add('panning');
+  return true;
+}
+
+function updatePinch(){
+  if(!pinchState||touchPointers.size<2)return false;
+  const points=[...touchPointers.values()].slice(0,2);
+  const dx=points[1].x-points[0].x;
+  const dy=points[1].y-points[0].y;
+  const distance=Math.max(1,Math.hypot(dx,dy));
+  const r=viewport.getBoundingClientRect();
+  const mx=(points[0].x+points[1].x)/2-r.left;
+  const my=(points[0].y+points[1].y)/2-r.top;
+  const scale=Math.max(.35,Math.min(2.25,pinchState.scale*(distance/pinchState.distance)));
+  state.view.scale=scale;
+  state.view.x=mx-pinchState.worldX*scale;
+  state.view.y=my-pinchState.worldY*scale;
+  applyView();
+  return true;
+}
 
 function contentSnapshot(){
   return JSON.stringify({nodes:state.nodes,edges:state.edges,groups:state.groups,annotations:state.annotations,diagram:state.diagram,nextId:state.nextId,nextGroupId:state.nextGroupId,nextAnnotationId:state.nextAnnotationId});
@@ -352,7 +440,7 @@ function restoreContentSnapshot(snapshot){
   state.nextGroupId=data.nextGroupId||Math.max(0,...state.groups.map(g=>Number(g.id)||0))+1;
   state.nextAnnotationId=data.nextAnnotationId||Math.max(0,...state.annotations.map(a=>Number(a.id)||0))+1;
   state.selectedNodeId=null;state.selectedNodeIds=[];state.selectedEdgeId=null;state.selectedGroupId=null;state.selectedAnnotationId=null;state.connectMode=false;state.connectSourceId=null;
-  connectBtn.classList.remove('primary');connectBtn.textContent='機器を接続';
+  syncConnectButton();
   renderAll();scheduleSave();
 }
 
@@ -388,7 +476,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.33',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.34',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -422,7 +510,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.33',
+    version:'1.34',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -437,7 +525,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.33',
+    version:'1.34',
     nextId:14,
     nextGroupId:5,
     nextAnnotationId:2,
@@ -702,6 +790,7 @@ function addNode(device){
   state.selectedAnnotationId = null;
   renderAll();
   scheduleSave();
+  if(isMobileLayout())closeMobileDrawers();
 }
 
 
@@ -723,6 +812,7 @@ function addAnnotation(){
   clearNodeSelection();
   renderAll();
   scheduleSave();
+  if(isMobileLayout())closeMobileDrawers();
   requestAnimationFrame(()=>document.getElementById('annotationText')?.select());
 }
 
@@ -1299,6 +1389,7 @@ function syncConnectButton(){
   }else{
     connectBtn.textContent='接続元を選択';
   }
+  syncMobileToolbar();
 }
 
 function cancelConnectionMode(showMessage=false){
@@ -1374,8 +1465,7 @@ function handleConnectNode(nodeId){
   clearNodeSelection();
   state.connectMode = false;
   state.connectSourceId = null;
-  connectBtn.classList.remove('primary');
-  connectBtn.textContent = '機器を接続';
+  syncConnectButton();
   renderAll();
   scheduleSave();
 }
@@ -1675,6 +1765,7 @@ function alignSelected(mode){
 }
 
 function renderProperties(){
+  syncMobileToolbar();
   const annotation=state.annotations.find(a=>a.id===state.selectedAnnotationId);
   if(annotation){
     properties.className='';
@@ -2081,17 +2172,36 @@ viewport.addEventListener('pointerdown',e=>{
   if(state.connectMode)return;
   if(e.button!==0&&e.button!==1)return;
   if(e.target.closest('.node'))return;
-  if(e.target.closest('.group-frame')||e.target.closest('.diagram-title-card'))return;
+  if(e.target.closest('.group-frame')||e.target.closest('.diagram-title-card')||e.target.closest('.annotation-text'))return;
   if(e.target.closest('.view-controls'))return;
   if(e.target.classList.contains('edge-hit')||e.target.classList.contains('edge-label'))return;
 
   e.preventDefault();
+
+  if(e.pointerType==='touch'){
+    touchPointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    try{viewport.setPointerCapture(e.pointerId)}catch{}
+    if(touchPointers.size>=2){
+      beginPinch();
+      return;
+    }
+  }
+
   panState={id:e.pointerId,sx:e.clientX,sy:e.clientY,ox:state.view.x,oy:state.view.y,moved:false};
-  viewport.setPointerCapture(e.pointerId);
+  try{viewport.setPointerCapture(e.pointerId)}catch{}
   viewport.classList.add('panning');
 });
 
 viewport.addEventListener('pointermove',e=>{
+  if(e.pointerType==='touch'&&touchPointers.has(e.pointerId)){
+    touchPointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pinchState&&touchPointers.size>=2){
+      e.preventDefault();
+      updatePinch();
+      return;
+    }
+  }
+
   if(!panState||panState.id!==e.pointerId)return;
   const dx=e.clientX-panState.sx,dy=e.clientY-panState.sy;
   if(Math.abs(dx)+Math.abs(dy)>3)panState.moved=true;
@@ -2101,9 +2211,22 @@ viewport.addEventListener('pointermove',e=>{
 });
 
 viewport.addEventListener('pointerup',e=>{
+  const wasPinching=!!pinchState;
+  if(e.pointerType==='touch'){
+    touchPointers.delete(e.pointerId);
+    try{if(viewport.hasPointerCapture(e.pointerId))viewport.releasePointerCapture(e.pointerId)}catch{}
+    if(wasPinching){
+      pinchState=null;
+      panState=null;
+      viewport.classList.remove('panning');
+      scheduleSave();
+      return;
+    }
+  }
+
   if(!panState||panState.id!==e.pointerId)return;
   const moved=panState.moved;
-  if(viewport.hasPointerCapture(e.pointerId))viewport.releasePointerCapture(e.pointerId);
+  try{if(viewport.hasPointerCapture(e.pointerId))viewport.releasePointerCapture(e.pointerId)}catch{}
   panState=null;
   viewport.classList.remove('panning');
   if(moved){scheduleSave();return}
@@ -2123,6 +2246,13 @@ viewport.addEventListener('pointerup',e=>{
     clearNodeSelection();
     renderAll();
   }
+});
+
+viewport.addEventListener('pointercancel',e=>{
+  if(e.pointerType==='touch')touchPointers.delete(e.pointerId);
+  if(panState?.id===e.pointerId)panState=null;
+  if(touchPointers.size<2)pinchState=null;
+  viewport.classList.remove('panning');
 });
 
 viewport.addEventListener('wheel',e=>{
@@ -2178,11 +2308,27 @@ connectBtn.addEventListener('click',()=>{
   }
 });
 
+mobileDevicesBtn?.addEventListener('click',()=>openMobileDrawer('left'));
+mobileEditBtn?.addEventListener('click',()=>openMobileDrawer('right'));
+mobileConnectBtn?.addEventListener('click',()=>{
+  closeMobileDrawers();
+  connectBtn.click();
+});
+mobileFitBtn?.addEventListener('click',()=>{
+  closeMobileDrawers();
+  fitAll();
+});
+mobileDrawerBackdrop?.addEventListener('click',closeMobileDrawers);
+mobileLeftCloseBtn?.addEventListener('click',closeMobileDrawers);
+mobileRightCloseBtn?.addEventListener('click',closeMobileDrawers);
+
 toggleLeftBtn.addEventListener('click',()=>{
+  closeMobileDrawers();
   app.classList.toggle('hide-left');
   requestAnimationFrame(applyView);
 });
 toggleRightBtn.addEventListener('click',()=>{
+  closeMobileDrawers();
   app.classList.toggle('hide-right');
   requestAnimationFrame(applyView);
 });
@@ -2222,7 +2368,7 @@ function showHelpModal(isFirst=false){
     <p class="welcome-lead">PC・モニター・USB機器・オーディオ・ネットワーク機器などの接続関係を、カードとケーブルで視覚化できます。</p>
     <div class="welcome-grid">
       <div class="welcome-card"><strong>① 機器を追加</strong><p>左のデバイス一覧から追加し、カード全体をドラッグして配置します。</p></div>
-      <div class="welcome-card"><strong>② ケーブルを接続</strong><p>カードをダブルクリックすると、その機器からすぐ接続を開始できます。上部の「機器を接続」も利用できます。</p></div>
+      <div class="welcome-card"><strong>② ケーブルを接続</strong><p>PCではカードのダブルクリック、スマートフォンでは下部の「接続」から開始できます。</p></div>
       <div class="welcome-card"><strong>③ 整えて見やすく</strong><p>スマートガイド・複数選択・整列・グループ枠で、構成を見やすく整理できます。</p></div>
       <div class="welcome-card"><strong>④ タイトル・出力</strong><p>構成図タイトルを付け、JSONでバックアップしたりPNG画像として書き出せます。</p></div>
     </div>
@@ -2781,10 +2927,14 @@ function showPngExportSettings(){
 pngBtn.addEventListener('click',showPngExportSettings);
 
 snapToggle.addEventListener('change',scheduleSave);
-window.addEventListener('resize',()=>applyView());
+window.addEventListener('resize',()=>{
+  applyView();
+  if(!isMobileLayout())closeMobileDrawers();
+});
 
 buildPalette();
 loadInitialState();
 applyView();
 updateHistoryButtons();
+syncMobileToolbar();
 if(firstRun && !localStorage.getItem(INTRO_KEY)) requestAnimationFrame(()=>showHelpModal(true));

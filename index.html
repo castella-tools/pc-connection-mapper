@@ -9,7 +9,7 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
   <link rel="apple-touch-icon" href="./icon-192.png">
-  <link rel="stylesheet" href="./styles.css?v=1.33">
+  <link rel="stylesheet" href="./styles.css?v=1.34">
 </head>
 <body>
   <div id="app" class="app">
@@ -17,7 +17,7 @@
       <div class="brand">
         <span class="brand-mark">⌘</span>
         <span>PC Connection Mapper</span>
-        <span class="version">v1.33</span>
+        <span class="version">v1.34</span>
       </div>
       <div class="top-actions">
         <button class="btn ghost" id="toggleLeftBtn">デバイス</button>
@@ -37,7 +37,10 @@
     </header>
 
     <aside class="sidebar left-panel">
-      <div class="panel-title">デバイス</div>
+      <div class="sidebar-heading">
+        <div class="panel-title">デバイス</div>
+        <button class="mobile-drawer-close" id="mobileLeftCloseBtn" type="button" aria-label="デバイスパネルを閉じる">×</button>
+      </div>
       <div class="device-search-wrap">
         <svg class="device-search-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8">
           <circle cx="11" cy="11" r="6"></circle>
@@ -80,10 +83,34 @@
     </main>
 
     <aside class="sidebar right-panel">
-      <div class="panel-title">プロパティ</div>
+      <div class="sidebar-heading">
+        <div class="panel-title">プロパティ</div>
+        <button class="mobile-drawer-close" id="mobileRightCloseBtn" type="button" aria-label="プロパティパネルを閉じる">×</button>
+      </div>
       <div id="properties" class="properties-empty">機器またはケーブルを選択してください。</div>
     </aside>
   </div>
+
+  <div class="mobile-drawer-backdrop" id="mobileDrawerBackdrop"></div>
+
+  <nav class="mobile-toolbar" id="mobileToolbar" aria-label="モバイル操作">
+    <button class="mobile-tool-btn" id="mobileDevicesBtn" type="button">
+      <span class="mobile-tool-icon" aria-hidden="true">＋</span>
+      <span>デバイス</span>
+    </button>
+    <button class="mobile-tool-btn" id="mobileConnectBtn" type="button" aria-pressed="false">
+      <span class="mobile-tool-icon" aria-hidden="true">↗</span>
+      <span id="mobileConnectLabel">接続</span>
+    </button>
+    <button class="mobile-tool-btn" id="mobileEditBtn" type="button">
+      <span class="mobile-tool-icon" aria-hidden="true">✎</span>
+      <span>編集</span>
+    </button>
+    <button class="mobile-tool-btn" id="mobileFitBtn" type="button">
+      <span class="mobile-tool-icon" aria-hidden="true">□</span>
+      <span>全体</span>
+    </button>
+  </nav>
 
   <div class="modal-backdrop" id="exportModal">
     <div class="modal">
@@ -102,11 +129,11 @@
 
   <div class="toast" id="toast"></div>
 
-  <script type="module" src="./app.js?v=1.33"></script>
+  <script type="module" src="./app.js?v=1.34"></script>
   <script>
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=1.33', { updateViaCache: 'none' }).catch(console.warn);
+        navigator.serviceWorker.register('./sw.js?v=1.34', { updateViaCache: 'none' }).catch(console.warn);
       });
     }
   </script>
