@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.34 loaded');
+console.info('PC Connection Mapper app.js v1.35 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -11,15 +11,18 @@ const PNG_OPTIONS_KEY = 'pc-connection-mapper-png-options-v1';
 const DEVICE_SEARCH_ALIASES = {
   'PC':'パソコン デスクトップ computer',
   'Laptop':'ノート ノートPC notebook',
+  'Tablet':'タブレット iPad Android tablet',
   'Smartphone':'スマートフォン スマホ phone mobile',
   'Game Console':'ゲーム機 console PS5 PlayStation Xbox Switch',
   'Monitor':'モニター ディスプレイ display',
+  'Projector':'プロジェクター projector',
   'KVM Switch':'KVM 切替器 切替 switch',
   'Capture Card':'キャプチャーボード キャプチャカード capture',
   'Keyboard':'キーボード',
   'Mouse':'マウス',
   'Trackball':'トラックボール',
   'Controller':'コントローラー ゲームパッド gamepad',
+  'Drawing Tablet':'ペンタブ ペンタブレット 液タブ drawing tablet',
   'Webcam':'ウェブカメラ web camera',
   'USB Hub':'USBハブ ハブ',
   'Dock':'ドック docking',
@@ -30,14 +33,22 @@ const DEVICE_SEARCH_ALIASES = {
   'Headphone':'ヘッドホン',
   'Earphone':'イヤホン',
   'Microphone':'マイク マイクロフォン',
+  'Amplifier':'アンプ amplifier amp',
   'ONU / Modem':'ONU モデム modem 回線終端',
   'Router':'ルーター',
   'Access Point':'アクセスポイント AP Wi-Fi 無線',
   'LAN Switch':'LANスイッチ スイッチングハブ',
+  'PoE Switch':'PoEスイッチ PoEハブ 給電スイッチ',
+  'Firewall':'ファイアウォール FW firewall',
+  'Network Camera':'ネットワークカメラ IPカメラ 監視カメラ camera',
+  'NVR':'NVR 録画 レコーダー network video recorder',
+  'Server':'サーバー server',
   'NAS':'NAS ネットワークストレージ',
   'Power / UPS':'電源 UPS',
   'Power Strip':'電源タップ タップ power strip',
+  'USB Charger':'USB充電器 充電器 charger GaN',
   'Printer':'プリンター',
+  'Smart Home / IoT':'スマートホーム IoT 家電 センサー hub smart home',
   'Other':'その他',
   'Text':'テキスト 文字 注釈 annotation label'
 };
@@ -48,6 +59,7 @@ const DEVICE_GROUPS = [
     items:[
       ['PC','pc','large'],
       ['Laptop','laptop','medium'],
+      ['Tablet','tablet','medium'],
       ['Smartphone','smartphone','small'],
       ['Game Console','game-console','medium']
     ]
@@ -56,6 +68,7 @@ const DEVICE_GROUPS = [
     label:'ディスプレイ・映像',
     items:[
       ['Monitor','monitor','medium'],
+      ['Projector','projector','medium'],
       ['KVM Switch','kvm-switch','medium'],
       ['Capture Card','capture-card','medium']
     ]
@@ -67,6 +80,7 @@ const DEVICE_GROUPS = [
       ['Mouse','mouse','small'],
       ['Trackball','trackball','small'],
       ['Controller','controller','small'],
+      ['Drawing Tablet','drawing-tablet','medium'],
       ['Webcam','webcam','small']
     ]
   },
@@ -86,7 +100,8 @@ const DEVICE_GROUPS = [
       ['Speaker','speaker','small'],
       ['Headphone','headphone','small'],
       ['Earphone','earphone','small'],
-      ['Microphone','microphone','small']
+      ['Microphone','microphone','small'],
+      ['Amplifier','amplifier','medium']
     ]
   },
   {
@@ -96,6 +111,11 @@ const DEVICE_GROUPS = [
       ['Router','router','medium'],
       ['Access Point','access-point','medium'],
       ['LAN Switch','lan-switch','medium'],
+      ['PoE Switch','poe-switch','medium'],
+      ['Firewall','firewall','medium'],
+      ['Network Camera','network-camera','medium'],
+      ['NVR','nvr','medium'],
+      ['Server','server','medium'],
       ['NAS','nas','medium']
     ]
   },
@@ -103,13 +123,15 @@ const DEVICE_GROUPS = [
     label:'電源',
     items:[
       ['Power / UPS','power','medium'],
-      ['Power Strip','power-strip','medium']
+      ['Power Strip','power-strip','medium'],
+      ['USB Charger','usb-charger','small']
     ]
   },
   {
     label:'その他',
     items:[
       ['Printer','printer','medium'],
+      ['Smart Home / IoT','smart-home','medium'],
       ['Other','other','small'],
       ['Text','text','small']
     ]
@@ -162,11 +184,14 @@ const GROUP_ACCENTS = [
 const ICON_SVGS = {
   pc:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
   laptop:'<rect x="5" y="4" width="14" height="11" rx="2"/><path d="M3 19h18l-2-3H5z"/>',
+  tablet:'<rect x="5" y="2.5" width="14" height="19" rx="2.5"/><path d="M9 5h6M11 18.5h2"/>',
   monitor:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+  projector:'<rect x="3" y="7" width="18" height="10" rx="3"/><circle cx="15.5" cy="12" r="2.5"/><path d="M6 10h4M6 14h3M7 17l-1 3M17 17l1 3"/>',
   keyboard:'<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M9 10h.01M12 10h.01M15 10h.01M18 10h.01M6 13h.01M9 13h.01M12 13h.01M15 13h.01M18 13h.01M7 16h10"/>',
   mouse:'<rect x="7" y="2.5" width="10" height="19" rx="5"/><path d="M12 2.5v6"/>',
   trackball:'<rect x="5" y="3" width="14" height="18" rx="6"/><circle cx="12" cy="9" r="3"/>',
   controller:'<path d="M8 8h8c3 0 5 2 5 5 0 4-2 7-4 7-1.5 0-2.3-2-3.5-2h-3C9.3 18 8.5 20 7 20c-2 0-4-3-4-7 0-3 2-5 5-5z"/><path d="M7 12h4M9 10v4M16 11h.01M18 13h.01"/>',
+  'drawing-tablet':'<rect x="3" y="4" width="15" height="16" rx="2"/><path d="M7 8h7v8H7zM20 4l1 1-7 7-2 1 1-2z"/>',
   webcam:'<rect x="4" y="6" width="16" height="11" rx="3"/><circle cx="12" cy="11.5" r="3"/><path d="M9 21h6M12 17v4"/>',
   'usb-hub':'<rect x="4" y="7" width="16" height="10" rx="2"/><path d="M8 7V4M12 7V3M16 7V4M8 17v3M12 17v4M16 17v3"/><circle cx="8" cy="4" r="1"/><circle cx="12" cy="3" r="1"/><circle cx="16" cy="4" r="1"/>',
   dock:'<rect x="3" y="6" width="18" height="12" rx="3"/><path d="M7 10h4M7 14h2M15 10h2M14 14h3"/>',
@@ -177,8 +202,14 @@ const ICON_SVGS = {
   headphone:'<path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="13" width="4" height="7" rx="2"/><rect x="17" y="13" width="4" height="7" rx="2"/>',
   earphone:'<path d="M7 5a4 4 0 1 1 4 4v9M17 5a4 4 0 1 0-4 4v9"/><path d="M11 18v3M13 18v3"/>',
   microphone:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/>',
+  amplifier:'<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="8" cy="12" r="2.5"/><circle cx="15" cy="12" r="1.5"/><path d="M18 10v4M5 9h.01"/>',
   router:'<rect x="3" y="11" width="18" height="8" rx="2"/><path d="M7 11V7M17 11V7M8 15h.01M12 15h.01M16 15h.01"/><path d="M5 6c2-2 4-3 7-3s5 1 7 3"/>',
   'lan-switch':'<rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 11h2v2H7zM11 11h2v2h-2zM15 11h2v2h-2z"/>',
+  'poe-switch':'<rect x="3" y="7" width="18" height="10" rx="2"/><path d="M6 11h2v2H6zM10 11h2v2h-2zM14 11h2v2h-2z"/><path d="m19 9-2 3h2l-2 3"/>',
+  firewall:'<path d="M12 3 20 6v5c0 5-3.2 8.3-8 10-4.8-1.7-8-5-8-10V6z"/><path d="M8 9h3v3H8zM13 9h3v3h-3zM10 14h4"/>',
+  'network-camera':'<rect x="4" y="7" width="13" height="9" rx="2"/><circle cx="12" cy="11.5" r="2.5"/><path d="m17 9 4-2v9l-4-2M8 16l-2 4M15 16l2 4"/>',
+  nvr:'<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M6 10h9M6 14h6"/><circle cx="18" cy="12" r="1.5"/>',
+  server:'<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M7 8h10M7 13h10M7 18h10"/><circle cx="9" cy="6" r=".7"/><circle cx="9" cy="11" r=".7"/><circle cx="9" cy="16" r=".7"/>',
   nas:'<rect x="5" y="3" width="14" height="18" rx="3"/><path d="M8 7h8M8 11h8"/><circle cx="9" cy="16" r="1"/>',
   printer:'<path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="9" rx="2"/><path d="M6 15h12v6H6zM17 12h.01"/>',
   power:'<path d="M13 2 6 13h6l-1 9 7-12h-6z"/>',
@@ -189,6 +220,8 @@ const ICON_SVGS = {
   modem:'<rect x="4" y="6" width="16" height="12" rx="3"/><path d="M8 10h.01M11 10h.01M14 10h.01M8 14h8"/><path d="M12 3v3"/>',
   'access-point':'<rect x="6" y="9" width="12" height="9" rx="2"/><path d="M12 18v3"/><path d="M8 7c1.1-1.1 2.4-1.6 4-1.6S14.9 5.9 16 7M5 4c1.9-1.8 4.2-2.7 7-2.7S17.1 2.2 19 4"/>',
   'power-strip':'<rect x="3" y="7" width="18" height="10" rx="3"/><circle cx="8" cy="12" r="1.6"/><circle cx="13" cy="12" r="1.6"/><path d="M18 10v4M21 12h2"/>',
+  'usb-charger':'<rect x="7" y="5" width="10" height="14" rx="2"/><path d="M10 5V2M14 5V2M10 12h4M12 10v4M17 15h3"/>',
+  'smart-home':'<path d="M3 11 12 4l9 7"/><path d="M6 10v10h12V10M10 20v-5h4v5"/><path d="M9 11c.8-.8 1.8-1.2 3-1.2s2.2.4 3 1.2M11 13c.3-.3.6-.4 1-.4s.7.1 1 .4"/>',
   text:'<path d="M5 6V4h14v2M12 4v16M8 20h8"/>',
   other:'<rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 9h6v6H9z"/>'
 };
@@ -231,8 +264,10 @@ const CABLES = {
   'RCA':{color:'#34d399'},
   'XLR':{color:'#34d399'},
   'Optical':{color:'#34d399'},
+  'Speaker Cable':{color:'#34d399'},
 
   'LAN':{color:'#fb923c'},
+  'PoE':{color:'#fb923c'},
 
   'AC Power':{color:'#94a3b8'},
   'DC Power':{color:'#94a3b8'},
@@ -246,8 +281,8 @@ const CABLES = {
 const CABLE_GROUPS = [
   {label:'USB / 高速I/O', items:['USB-A','USB-B','USB-C','Micro-USB','USB4','Thunderbolt']},
   {label:'映像', items:['HDMI','DisplayPort','DVI','VGA']},
-  {label:'音声', items:['3.5mm','6.3mm','RCA','XLR','Optical']},
-  {label:'ネットワーク', items:['LAN']},
+  {label:'音声', items:['3.5mm','6.3mm','RCA','XLR','Optical','Speaker Cable']},
+  {label:'ネットワーク', items:['LAN','PoE']},
   {label:'電源', items:['AC Power','DC Power']},
   {label:'無線', items:['Bluetooth','Wi-Fi']},
   {label:'その他', items:['Other']}
@@ -476,7 +511,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.34',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.35',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -510,7 +545,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.34',
+    version:'1.35',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -525,7 +560,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.34',
+    version:'1.35',
     nextId:14,
     nextGroupId:5,
     nextAnnotationId:2,
