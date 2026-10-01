@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.38 loaded');
+console.info('PC Connection Mapper app.js v1.39 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -525,7 +525,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.38',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',theme:'dark',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.39',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',theme:'dark',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -559,7 +559,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.38',
+    version:'1.39',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -574,7 +574,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.38',
+    version:'1.39',
     nextId:14,
     nextGroupId:5,
     nextAnnotationId:2,
