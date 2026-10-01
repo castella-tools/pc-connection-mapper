@@ -9,7 +9,7 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
   <link rel="apple-touch-icon" href="./icon-192.png">
-  <link rel="stylesheet" href="./styles.css?v=1.35">
+  <link rel="stylesheet" href="./styles.css?v=1.36">
 </head>
 <body>
   <div id="app" class="app">
@@ -17,7 +17,7 @@
       <div class="brand">
         <span class="brand-mark">⌘</span>
         <span>PC Connection Mapper</span>
-        <span class="version">v1.35</span>
+        <span class="version">v1.36</span>
       </div>
       <div class="top-actions">
         <button class="btn ghost" id="toggleLeftBtn">デバイス</button>
@@ -56,6 +56,11 @@
           <input id="snapToggle" type="checkbox" checked>
           <span>20pxグリッドに吸着</span>
         </label>
+        <label class="form-label theme-control-label" for="backgroundThemeSelect">背景</label>
+        <select class="form-control compact-control" id="backgroundThemeSelect">
+          <option value="dark">Dark</option>
+          <option value="light">Light</option>
+        </select>
         <button class="btn group-add-btn" id="addGroupBtn">＋ グループ枠を追加</button>
       </div>
     </aside>
@@ -129,11 +134,11 @@
 
   <div class="toast" id="toast"></div>
 
-  <script type="module" src="./app.js?v=1.35"></script>
+  <script type="module" src="./app.js?v=1.36"></script>
   <script>
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=1.35', { updateViaCache: 'none' }).catch(console.warn);
+        navigator.serviceWorker.register('./sw.js?v=1.36', { updateViaCache: 'none' }).catch(console.warn);
       });
     }
   </script>

@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.35 loaded');
+console.info('PC Connection Mapper app.js v1.36 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -301,6 +301,7 @@ const deviceSearch = document.getElementById('deviceSearch');
 const clearDeviceSearchBtn = document.getElementById('clearDeviceSearchBtn');
 const properties = document.getElementById('properties');
 const snapToggle = document.getElementById('snapToggle');
+const backgroundThemeSelect = document.getElementById('backgroundThemeSelect');
 
 const connectBtn = document.getElementById('connectBtn');
 const jsonSaveBtn = document.getElementById('jsonSaveBtn');
@@ -346,7 +347,7 @@ let state = {
   edges: [],
   groups: [],
   annotations: [],
-  diagram:{title:'',size:'medium',x:1450,y:900},
+  diagram:{title:'',size:'medium',theme:'dark',x:1450,y:900},
   view: {x:0,y:0,scale:1},
   selectedNodeId:null,
   selectedNodeIds:[],
@@ -447,6 +448,18 @@ function updatePinch(){
   return true;
 }
 
+
+function diagramTheme(){
+  return state.diagram?.theme==='light' ? 'light' : 'dark';
+}
+
+function applyDiagramTheme(){
+  const light=diagramTheme()==='light';
+  world.classList.toggle('theme-light',light);
+  viewport.classList.toggle('theme-light',light);
+  if(backgroundThemeSelect)backgroundThemeSelect.value=light?'light':'dark';
+}
+
 function contentSnapshot(){
   return JSON.stringify({nodes:state.nodes,edges:state.edges,groups:state.groups,annotations:state.annotations,diagram:state.diagram,nextId:state.nextId,nextGroupId:state.nextGroupId,nextAnnotationId:state.nextAnnotationId});
 }
@@ -470,7 +483,8 @@ function restoreContentSnapshot(snapshot){
   state.edges=data.edges||[];
   state.groups=data.groups||[];
   state.annotations=data.annotations||[];
-  state.diagram={title:'',size:'medium',x:1450,y:900,...(data.diagram||{})};
+  state.diagram={title:'',size:'medium',theme:'dark',x:1450,y:900,...(data.diagram||{})};
+  state.diagram.theme=state.diagram.theme==='light'?'light':'dark';
   state.nextId=data.nextId||Math.max(0,...state.nodes.map(n=>Number(n.id)||0))+1;
   state.nextGroupId=data.nextGroupId||Math.max(0,...state.groups.map(g=>Number(g.id)||0))+1;
   state.nextAnnotationId=data.nextAnnotationId||Math.max(0,...state.annotations.map(a=>Number(a.id)||0))+1;
@@ -511,7 +525,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.35',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.36',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',theme:'dark',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -545,7 +559,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.35',
+    version:'1.36',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -560,11 +574,11 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.35',
+    version:'1.36',
     nextId:14,
     nextGroupId:5,
     nextAnnotationId:2,
-    diagram:{title:'Home PC & Network Setup',size:'medium',x:720,y:570},
+    diagram:{title:'Home PC & Network Setup',size:'medium',theme:'dark',x:720,y:570},
     annotations:[
       {id:1,text:'Internet → LAN → PC / Wi-Fi',size:'small',x:720,y:620}
     ],
@@ -634,7 +648,9 @@ function applyImportedState(data, save=true){
     iconKey:n.iconKey || deviceTypeInfo(n.type).iconKey || 'other',
     model:n.model || '',
     note:n.note || '',
-    locked:!!n.locked
+    locked:!!n.locked,
+    imageData:typeof n.imageData==='string'?n.imageData:'',
+    imageOpacity:Number.isFinite(+n.imageOpacity)?Math.max(.05,Math.min(.35,+n.imageOpacity)):.14
   })) : [];
   state.edges = Array.isArray(data.edges) ? data.edges.map(e=>({
     ...e,
@@ -664,6 +680,7 @@ function applyImportedState(data, save=true){
   state.diagram = {
     title:data.diagram?.title || '',
     size:TITLE_SIZES[data.diagram?.size]?data.diagram.size:'medium',
+    theme:data.diagram?.theme==='light'?'light':'dark',
     x:Number.isFinite(+data.diagram?.x)?+data.diagram.x:1450,
     y:Number.isFinite(+data.diagram?.y)?+data.diagram.y:900
   };
@@ -814,6 +831,8 @@ function addNode(device){
     model:'',
     note:'',
     locked:false,
+    imageData:'',
+    imageOpacity:.14,
     x:snap(Math.max(0,Math.min(WORKSPACE.width-200, center.x-80))),
     y:snap(Math.max(0,Math.min(WORKSPACE.height-120, center.y-40)))
   };
@@ -1240,6 +1259,7 @@ function smartGuideCorrection(positions,dx,dy){
 }
 
 function renderAll(){
+  applyDiagramTheme();
   renderGroups();
   renderEdges();
   renderAnnotations();
@@ -1310,6 +1330,7 @@ function renderNodes(){
     el.style.width = `${s.w}px`;
     el.style.height = `${s.h}px`;
     el.innerHTML = `
+      <div class="node-image-layer"></div>
       <div class="node-head">
         <div class="node-icon">${iconSvg(nodeIconKey(node),'node-svg')}</div>
         <div class="node-content">
@@ -1321,6 +1342,7 @@ function renderNodes(){
       <div class="node-note">${escapeHtml(node.note)}</div>
       ${node.locked?'<div class="lock-badge" title="固定中">LOCK</div>':''}
     `;
+    applyNodeImageVisual(el,node);
     bindNodeDrag(el,node);
     nodesLayer.appendChild(el);
   });
@@ -1688,6 +1710,59 @@ function renderEdges(){
   });
 }
 
+
+function applyNodeImageVisual(el,node){
+  const layer=el?.querySelector('.node-image-layer');
+  if(!layer)return;
+  if(node.imageData){
+    layer.style.backgroundImage=`url("${node.imageData}")`;
+    layer.style.opacity=String(Number.isFinite(+node.imageOpacity)?+node.imageOpacity:.14);
+    layer.hidden=false;
+  }else{
+    layer.style.backgroundImage='none';
+    layer.hidden=true;
+  }
+}
+
+function readFileAsDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(String(reader.result||''));
+    reader.onerror=()=>reject(new Error('画像ファイルを読み込めませんでした。'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImageFromDataUrl(src){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>resolve(img);
+    img.onerror=()=>reject(new Error('画像を読み込めませんでした。'));
+    img.src=src;
+  });
+}
+
+async function prepareCardImage(file){
+  if(!file?.type?.startsWith('image/'))throw new Error('画像ファイルを選択してください。');
+  if(file.size>12*1024*1024)throw new Error('画像は12MB以下を選択してください。');
+
+  const src=await readFileAsDataUrl(file);
+  const img=await loadImageFromDataUrl(src);
+  const maxSide=720;
+  const ratio=Math.min(1,maxSide/Math.max(img.naturalWidth||img.width,img.naturalHeight||img.height));
+  const w=Math.max(1,Math.round((img.naturalWidth||img.width)*ratio));
+  const h=Math.max(1,Math.round((img.naturalHeight||img.height)*ratio));
+  const canvas=document.createElement('canvas');
+  canvas.width=w;canvas.height=h;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,w,h);
+  ctx.drawImage(img,0,0,w,h);
+
+  let result=canvas.toDataURL('image/webp',.76);
+  if(!result.startsWith('data:image/webp'))result=canvas.toDataURL('image/jpeg',.78);
+  return result;
+}
+
 function updateNodeVisual(node){
   const el=nodesLayer.querySelector(`[data-id="${node.id}"]`);
   if(!el) return;
@@ -1702,6 +1777,7 @@ function updateNodeVisual(node){
   el.querySelector('.node-type').textContent=node.type;
   el.querySelector('.node-model').textContent=node.model;
   el.querySelector('.node-note').textContent=node.note;
+  applyNodeImageVisual(el,node);
   renderEdges();
   scheduleSave();
 }
@@ -2036,6 +2112,21 @@ function renderProperties(){
       <label class="form-label">メモ</label>
       <textarea class="form-control" id="nodeNote" rows="2">${escapeHtml(node.note)}</textarea>
     </div>
+    <div class="form-section">
+      <h3>カード画像</h3>
+      <div class="node-image-preview" id="nodeImagePreview"></div>
+      <input id="nodeImageInput" type="file" accept="image/*" hidden>
+      <div class="action-grid">
+        <button class="btn" id="chooseNodeImageBtn">画像を選択</button>
+        <button class="btn" id="removeNodeImageBtn" ${node.imageData?'':'disabled'}>画像を削除</button>
+      </div>
+      <div id="nodeImageOpacityWrap" ${node.imageData?'':'hidden'}>
+        <label class="form-label">画像の濃さ</label>
+        <input class="form-control" id="nodeImageOpacity" type="range" min="5" max="35" value="${Math.round((node.imageOpacity??.14)*100)}">
+        <div class="range-caption"><span>薄い</span><span id="nodeImageOpacityValue">${Math.round((node.imageOpacity??.14)*100)}%</span><span>濃い</span></div>
+      </div>
+      <div class="mini-text" style="margin-top:8px">画像はカード全面に薄く表示します。保存容量を抑えるため、選択時に縮小・圧縮されます。</div>
+    </div>
     <button class="btn" id="connectNodeBtn" style="width:100%;margin-bottom:8px">この機器から接続</button>
     <div class="action-grid single-actions">
       <button class="btn" id="duplicateNodeBtn">複製</button>
@@ -2056,6 +2147,62 @@ function renderProperties(){
     const type=DEVICE_TYPES.find(d=>d.type===e.target.value);
     node.type=type.type;node.iconKey=type.iconKey;updateNodeVisual(node);
   });
+  const imagePreview=document.getElementById('nodeImagePreview');
+  if(node.imageData){
+    imagePreview.style.backgroundImage=`url("${node.imageData}")`;
+    imagePreview.classList.add('has-image');
+  }else{
+    imagePreview.textContent='画像なし';
+  }
+
+  const imageInput=document.getElementById('nodeImageInput');
+  document.getElementById('chooseNodeImageBtn').onclick=()=>imageInput.click();
+  imageInput.addEventListener('change',async()=>{
+    const file=imageInput.files?.[0];
+    if(!file)return;
+    const before=contentSnapshot();
+    try{
+      const dataUrl=await prepareCardImage(file);
+      node.imageData=dataUrl;
+      if(!Number.isFinite(+node.imageOpacity))node.imageOpacity=.14;
+      pushUndoSnapshot(before);
+      renderNodes();
+      renderProperties();
+      scheduleSave();
+      showToast('カード画像を追加しました');
+    }catch(err){
+      console.error(err);
+      alert(err.message||'画像を追加できませんでした。');
+    }finally{
+      imageInput.value='';
+    }
+  });
+
+  document.getElementById('removeNodeImageBtn').onclick=()=>{
+    if(!node.imageData)return;
+    pushUndoSnapshot();
+    node.imageData='';
+    renderNodes();
+    renderProperties();
+    scheduleSave();
+    showToast('カード画像を削除しました');
+  };
+
+  const imageOpacity=document.getElementById('nodeImageOpacity');
+  if(imageOpacity){
+    imageOpacity.addEventListener('focus',()=>beginTrackedEdit(imageOpacity));
+    imageOpacity.addEventListener('pointerdown',()=>beginTrackedEdit(imageOpacity));
+    imageOpacity.addEventListener('input',e=>{
+      node.imageOpacity=+e.target.value/100;
+      document.getElementById('nodeImageOpacityValue').textContent=`${e.target.value}%`;
+      const card=nodesLayer.querySelector(`[data-id="${node.id}"]`);
+      if(card)applyNodeImageVisual(card,node);
+      scheduleSave();
+    });
+    imageOpacity.addEventListener('change',()=>endTrackedEdit(imageOpacity));
+    imageOpacity.addEventListener('blur',()=>endTrackedEdit(imageOpacity));
+  }
+
   document.getElementById('connectNodeBtn').onclick=()=>startConnectionFromNode(node.id);
   document.getElementById('duplicateNodeBtn').onclick=duplicateSelected;
   document.getElementById('lockNodeBtn').onclick=()=>setSelectedLocked(!node.locked);
@@ -2546,6 +2693,36 @@ async function preparePngDeviceIcons(){
   return images;
 }
 
+
+function loadPngNodeImage(src){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>resolve(img);
+    img.onerror=()=>reject(new Error('カード画像をPNG用に読み込めませんでした。'));
+    img.src=src;
+  });
+}
+
+async function preparePngNodeImages(){
+  const entries=state.nodes.filter(node=>node.imageData).map(node=>[node.id,loadPngNodeImage(node.imageData)]);
+  const images=new Map();
+  await Promise.all(entries.map(async([id,promise])=>{
+    try{images.set(id,await promise)}
+    catch(err){console.warn(err)}
+  }));
+  return images;
+}
+
+function drawImageCover(ctx,img,x,y,w,h){
+  const iw=img.naturalWidth||img.width;
+  const ih=img.naturalHeight||img.height;
+  if(!iw||!ih)return;
+  const scale=Math.max(w/iw,h/ih);
+  const dw=iw*scale,dh=ih*scale;
+  const dx=x+(w-dw)/2,dy=y+(h-dh)/2;
+  ctx.drawImage(img,dx,dy,dw,dh);
+}
+
 function canvasEllipsis(ctx,text,maxWidth){
   const value=String(text??'');
   if(ctx.measureText(value).width<=maxWidth)return value;
@@ -2677,9 +2854,13 @@ async function renderPng(options){
   canvas.height=height;
   const ctx=canvas.getContext('2d');
   ctx.scale(scale,scale);
-  const pngIcons=await preparePngDeviceIcons();
+  const [pngIcons,pngNodeImages]=await Promise.all([
+    preparePngDeviceIcons(),
+    preparePngNodeImages()
+  ]);
+  const light=diagramTheme()==='light';
 
-  ctx.fillStyle='#0f131b';
+  ctx.fillStyle=light?'#ffffff':'#0f131b';
   ctx.fillRect(0,0,bounds.w,bounds.h);
 
   if(options.grid){
@@ -2687,20 +2868,20 @@ async function renderPng(options){
     for(let x=Math.floor(bounds.x/20)*20;x<=bounds.x+bounds.w;x+=20){
       const xx=x-bounds.x+.5;
       ctx.beginPath();ctx.moveTo(xx,0);ctx.lineTo(xx,bounds.h);
-      ctx.strokeStyle=x%100===0?'#222936':'#171d27';
+      ctx.strokeStyle=light?(x%100===0?'#dfe5ec':'#eef2f6'):(x%100===0?'#222936':'#171d27');
       ctx.stroke();
     }
     for(let y=Math.floor(bounds.y/20)*20;y<=bounds.y+bounds.h;y+=20){
       const yy=y-bounds.y+.5;
       ctx.beginPath();ctx.moveTo(0,yy);ctx.lineTo(bounds.w,yy);
-      ctx.strokeStyle=y%100===0?'#222936':'#171d27';
+      ctx.strokeStyle=light?(y%100===0?'#dfe5ec':'#eef2f6'):(y%100===0?'#222936':'#171d27');
       ctx.stroke();
     }
   }
 
   if((state.diagram?.title||'').trim()){
     ctx.save();
-    ctx.fillStyle='#f1f5f9';
+    ctx.fillStyle=light?'#172033':'#f1f5f9';
     const titleFontSize=TITLE_SIZES[state.diagram.size]||TITLE_SIZES.medium;
     ctx.font=`700 ${titleFontSize}px "Segoe UI","Yu Gothic UI","Yu Gothic","Meiryo",Arial,sans-serif`;
     ctx.textAlign='left';
@@ -2732,7 +2913,7 @@ async function renderPng(options){
       const pillY=y-14;
       const pillH=25;
 
-      ctx.fillStyle='#171d27';
+      ctx.fillStyle=light?'#ffffff':'#171d27';
       ctx.strokeStyle=hexToRgba(group.color,.52);
       ctx.lineWidth=1;
       roundRect(ctx,pillX,pillY,titleWidth,pillH,8);
@@ -2746,7 +2927,7 @@ async function renderPng(options){
       ctx.fill();
 
       // Title text.
-      ctx.fillStyle='#dce5f1';
+      ctx.fillStyle=light?'#334155':'#dce5f1';
       ctx.textAlign='left';
       ctx.textBaseline='middle';
       const maxTextWidth=titleWidth-24;
@@ -2763,7 +2944,7 @@ async function renderPng(options){
   state.annotations.forEach(annotation=>{
     ctx.save();
     const fontSize=TEXT_SIZES[annotation.size]||TEXT_SIZES.medium;
-    ctx.fillStyle='#cbd5e1';
+    ctx.fillStyle=light?'#334155':'#cbd5e1';
     ctx.font=`500 ${fontSize}px "Segoe UI","Yu Gothic UI","Yu Gothic","Meiryo",Arial,sans-serif`;
     ctx.textAlign='left';
     ctx.textBaseline='top';
@@ -2792,9 +2973,9 @@ async function renderPng(options){
       ctx.font='11px "Segoe UI","Yu Gothic UI","Yu Gothic","Meiryo",Arial,sans-serif';
       ctx.textAlign='center';
       const width=ctx.measureText(label).width;
-      ctx.fillStyle='rgba(15,19,27,.92)';
+      ctx.fillStyle=light?'rgba(255,255,255,.94)':'rgba(15,19,27,.92)';
       ctx.fillRect(labelPoint.x-width/2-4,labelPoint.y-12,width+8,16);
-      ctx.fillStyle='#d7deea';ctx.fillText(label,labelPoint.x,labelPoint.y);
+      ctx.fillStyle=light?'#334155':'#d7deea';ctx.fillText(label,labelPoint.x,labelPoint.y);
       ctx.restore();
     }
   });
@@ -2804,15 +2985,28 @@ async function renderPng(options){
     const accent=deviceAccent(node.type);
     ctx.save();
 
-    ctx.fillStyle='#1d2430';ctx.strokeStyle='#3b455a';ctx.lineWidth=1;
+    ctx.fillStyle=light?'#ffffff':'#1d2430';
+    ctx.strokeStyle=light?'#cbd5e1':'#3b455a';
+    ctx.lineWidth=1;
     roundRect(ctx,x,y,s.w,s.h,14);ctx.fill();ctx.stroke();
+
+    const nodeImage=pngNodeImages.get(node.id);
+    if(nodeImage){
+      ctx.save();
+      ctx.beginPath();
+      roundRect(ctx,x+1,y+1,s.w-2,s.h-2,13);
+      ctx.clip();
+      ctx.globalAlpha=Number.isFinite(+node.imageOpacity)?+node.imageOpacity:.14;
+      drawImageCover(ctx,nodeImage,x,y,s.w,s.h);
+      ctx.restore();
+    }
 
     ctx.fillStyle=accent;
     ctx.fillRect(x+14,y+1,s.w-28,3);
 
     const iconBoxX=x+10,iconBoxY=y+(node.size==='xlarge'?12:9);
-    ctx.fillStyle='#192131';
-    ctx.strokeStyle='#313d52';
+    ctx.fillStyle=light?'#f1f5f9':'#192131';
+    ctx.strokeStyle=light?'#d7dee8':'#313d52';
     ctx.lineWidth=1;
     roundRect(ctx,iconBoxX,iconBoxY,28,28,8);ctx.fill();ctx.stroke();
 
@@ -2834,23 +3028,23 @@ async function renderPng(options){
     const uiFont='"Segoe UI","Yu Gothic UI","Yu Gothic","Meiryo",Arial,sans-serif';
 
     ctx.textAlign='left';
-    ctx.fillStyle='#edf2f7';
+    ctx.fillStyle=light?'#172033':'#edf2f7';
     ctx.font=`700 ${node.size==='xlarge'?15:13}px ${uiFont}`;
     ctx.fillText(canvasEllipsis(ctx,node.name||node.type,headerWidth),textX,titleY);
 
-    ctx.fillStyle='#909bad';
+    ctx.fillStyle=light?'#64748b':'#909bad';
     ctx.font=`9px ${uiFont}`;
     ctx.fillText(canvasEllipsis(ctx,node.type,headerWidth),textX,titleY+13);
 
     let noteY=y+(node.size==='xlarge'?67:52);
     if(node.model){
-      ctx.fillStyle='#9cabc0';
+      ctx.fillStyle=light?'#475569':'#9cabc0';
       ctx.font=`${node.size==='xlarge'?11:10}px ${uiFont}`;
       ctx.fillText(canvasEllipsis(ctx,node.model,headerWidth),textX,titleY+27);
       noteY=y+(node.size==='xlarge'?82:64);
     }
 
-    ctx.fillStyle='#aab4c5';
+    ctx.fillStyle=light?'#556274':'#aab4c5';
     ctx.font=`${node.size==='xlarge'?11:9}px ${uiFont}`;
     const noteLimit=node.size==='xlarge'?6:2;
     const lineHeight=node.size==='xlarge'?16:12;
@@ -2869,9 +3063,10 @@ async function renderPng(options){
       const lockText='LOCK';
       const tw=ctx.measureText(lockText).width;
       const bx=x+s.w-tw-18,by=y+s.h-18;
-      ctx.fillStyle='#131925';ctx.strokeStyle='#3d4a60';
+      ctx.fillStyle=light?'#f8fafc':'#131925';
+      ctx.strokeStyle=light?'#cbd5e1':'#3d4a60';
       roundRect(ctx,bx,by,tw+10,12,4);ctx.fill();ctx.stroke();
-      ctx.fillStyle='#8ea1bb';ctx.fillText(lockText,bx+5,by+9);
+      ctx.fillStyle=light?'#64748b':'#8ea1bb';ctx.fillText(lockText,bx+5,by+9);
     }
     ctx.restore();
   });
@@ -2890,6 +3085,7 @@ function showPngExportSettings(){
     <div class="png-settings">
       <div class="png-setting-section">
         <div class="png-setting-title">表示</div>
+        <div class="mini-text png-theme-note">背景：${diagramTheme()==='light'?'Light（白）':'Dark（黒）'} ※左の「配置」から変更できます。</div>
         <label class="png-option-row">
           <span><strong>グリッド</strong><small>背景の方眼をPNGにも表示</small></span>
           <input id="pngGrid" type="checkbox" ${options.grid?'checked':''}>
@@ -2960,6 +3156,14 @@ function showPngExportSettings(){
 }
 
 pngBtn.addEventListener('click',showPngExportSettings);
+
+backgroundThemeSelect?.addEventListener('change',e=>{
+  pushUndoSnapshot();
+  state.diagram.theme=e.target.value==='light'?'light':'dark';
+  applyDiagramTheme();
+  renderAll();
+  scheduleSave();
+});
 
 snapToggle.addEventListener('change',scheduleSave);
 window.addEventListener('resize',()=>{
