@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.36 loaded');
+console.info('PC Connection Mapper app.js v1.37 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -525,7 +525,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.36',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',theme:'dark',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.37',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',theme:'dark',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -559,7 +559,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.36',
+    version:'1.37',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -574,7 +574,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.36',
+    version:'1.37',
     nextId:14,
     nextGroupId:5,
     nextAnnotationId:2,
@@ -1331,6 +1331,7 @@ function renderNodes(){
     el.style.height = `${s.h}px`;
     el.innerHTML = `
       <div class="node-image-layer"></div>
+      <div class="node-image-fade"></div>
       <div class="node-head">
         <div class="node-icon">${iconSvg(nodeIconKey(node),'node-svg')}</div>
         <div class="node-content">
@@ -1713,14 +1714,18 @@ function renderEdges(){
 
 function applyNodeImageVisual(el,node){
   const layer=el?.querySelector('.node-image-layer');
+  const fade=el?.querySelector('.node-image-fade');
   if(!layer)return;
-  if(node.imageData){
+  const hasImage=!!node.imageData;
+  if(hasImage){
     layer.style.backgroundImage=`url("${node.imageData}")`;
     layer.style.opacity=String(Number.isFinite(+node.imageOpacity)?+node.imageOpacity:.14);
     layer.hidden=false;
+    if(fade)fade.hidden=false;
   }else{
     layer.style.backgroundImage='none';
     layer.hidden=true;
+    if(fade)fade.hidden=true;
   }
 }
 
@@ -1748,7 +1753,7 @@ async function prepareCardImage(file){
 
   const src=await readFileAsDataUrl(file);
   const img=await loadImageFromDataUrl(src);
-  const maxSide=720;
+  const maxSide=512;
   const ratio=Math.min(1,maxSide/Math.max(img.naturalWidth||img.width,img.naturalHeight||img.height));
   const w=Math.max(1,Math.round((img.naturalWidth||img.width)*ratio));
   const h=Math.max(1,Math.round((img.naturalHeight||img.height)*ratio));
@@ -1758,8 +1763,8 @@ async function prepareCardImage(file){
   ctx.clearRect(0,0,w,h);
   ctx.drawImage(img,0,0,w,h);
 
-  let result=canvas.toDataURL('image/webp',.76);
-  if(!result.startsWith('data:image/webp'))result=canvas.toDataURL('image/jpeg',.78);
+  let result=canvas.toDataURL('image/webp',.62);
+  if(!result.startsWith('data:image/webp'))result=canvas.toDataURL('image/jpeg',.68);
   return result;
 }
 
@@ -2125,7 +2130,7 @@ function renderProperties(){
         <input class="form-control" id="nodeImageOpacity" type="range" min="5" max="35" value="${Math.round((node.imageOpacity??.14)*100)}">
         <div class="range-caption"><span>薄い</span><span id="nodeImageOpacityValue">${Math.round((node.imageOpacity??.14)*100)}%</span><span>濃い</span></div>
       </div>
-      <div class="mini-text" style="margin-top:8px">画像はカード全面に薄く表示します。保存容量を抑えるため、選択時に縮小・圧縮されます。</div>
+      <div class="mini-text" style="margin-top:8px">画像は右下寄せの薄い背景として表示します。保存容量を抑えるため、選択時に最大512px相当へ縮小・圧縮されます。</div>
     </div>
     <button class="btn" id="connectNodeBtn" style="width:100%;margin-bottom:8px">この機器から接続</button>
     <div class="action-grid single-actions">
@@ -2713,13 +2718,14 @@ async function preparePngNodeImages(){
   return images;
 }
 
-function drawImageCover(ctx,img,x,y,w,h){
+function drawImageContainBottomRight(ctx,img,x,y,w,h){
   const iw=img.naturalWidth||img.width;
   const ih=img.naturalHeight||img.height;
   if(!iw||!ih)return;
-  const scale=Math.max(w/iw,h/ih);
+  const scale=Math.min(w/iw,h/ih);
   const dw=iw*scale,dh=ih*scale;
-  const dx=x+(w-dw)/2,dy=y+(h-dh)/2;
+  const dx=x+w-dw;
+  const dy=y+h-dh;
   ctx.drawImage(img,dx,dy,dw,dh);
 }
 
@@ -2997,7 +3003,24 @@ async function renderPng(options){
       roundRect(ctx,x+1,y+1,s.w-2,s.h-2,13);
       ctx.clip();
       ctx.globalAlpha=Number.isFinite(+node.imageOpacity)?+node.imageOpacity:.14;
-      drawImageCover(ctx,nodeImage,x,y,s.w,s.h);
+      drawImageContainBottomRight(ctx,nodeImage,x+16,y+16,s.w-30,s.h-28);
+      ctx.globalAlpha=1;
+      const fade=ctx.createLinearGradient(x+8,y+8,x+s.w-10,y+s.h-8);
+      if(light){
+        fade.addColorStop(0,'rgba(255,255,255,1)');
+        fade.addColorStop(.28,'rgba(255,255,255,.95)');
+        fade.addColorStop(.56,'rgba(255,255,255,.54)');
+        fade.addColorStop(.82,'rgba(255,255,255,.14)');
+        fade.addColorStop(1,'rgba(255,255,255,0)');
+      }else{
+        fade.addColorStop(0,'rgba(29,36,48,1)');
+        fade.addColorStop(.28,'rgba(29,36,48,.94)');
+        fade.addColorStop(.56,'rgba(29,36,48,.50)');
+        fade.addColorStop(.82,'rgba(29,36,48,.14)');
+        fade.addColorStop(1,'rgba(29,36,48,0)');
+      }
+      ctx.fillStyle=fade;
+      ctx.fillRect(x+1,y+1,s.w-2,s.h-2);
       ctx.restore();
     }
 

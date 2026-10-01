@@ -830,12 +830,24 @@ textarea.form-control{resize:vertical;min-height:62px;line-height:1.4}
 /* Optional card background images */
 .node-image-layer{
   position:absolute;
-  inset:0;
+  inset:12px 12px 14px 18px;
   z-index:0;
   pointer-events:none;
-  background-position:center;
-  background-size:cover;
+  background-position:right bottom;
+  background-size:contain;
   background-repeat:no-repeat;
+  -webkit-mask-image:linear-gradient(135deg,rgba(0,0,0,0) 10%,rgba(0,0,0,.12) 30%,rgba(0,0,0,.62) 62%,rgba(0,0,0,1) 88%);
+  mask-image:linear-gradient(135deg,rgba(0,0,0,0) 10%,rgba(0,0,0,.12) 30%,rgba(0,0,0,.62) 62%,rgba(0,0,0,1) 88%);
+}
+.node-image-fade{
+  position:absolute;
+  inset:0;
+  z-index:1;
+  pointer-events:none;
+  background:linear-gradient(135deg,rgba(29,36,48,.98) 4%,rgba(29,36,48,.92) 26%,rgba(29,36,48,.42) 58%,rgba(29,36,48,.10) 82%,rgba(29,36,48,0) 100%);
+}
+.world.theme-light .node-image-fade{
+  background:linear-gradient(135deg,rgba(255,255,255,.98) 4%,rgba(255,255,255,.92) 26%,rgba(255,255,255,.44) 58%,rgba(255,255,255,.12) 82%,rgba(255,255,255,0) 100%);
 }
 .node-head,.node-note,.lock-badge{position:relative;z-index:2}
 .node::before{z-index:3}
@@ -848,7 +860,7 @@ textarea.form-control{resize:vertical;min-height:62px;line-height:1.4}
   border-radius:9px;
   background:#121720;
   background-position:center;
-  background-size:cover;
+  background-size:contain;
   background-repeat:no-repeat;
   color:#718097;
   font-size:10px;
