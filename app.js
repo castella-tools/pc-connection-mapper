@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.37 loaded');
+console.info('PC Connection Mapper app.js v1.38 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -525,7 +525,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.37',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',theme:'dark',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.38',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',theme:'dark',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -559,7 +559,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.37',
+    version:'1.38',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -574,7 +574,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.37',
+    version:'1.38',
     nextId:14,
     nextGroupId:5,
     nextAnnotationId:2,
@@ -650,7 +650,7 @@ function applyImportedState(data, save=true){
     note:n.note || '',
     locked:!!n.locked,
     imageData:typeof n.imageData==='string'?n.imageData:'',
-    imageOpacity:Number.isFinite(+n.imageOpacity)?Math.max(.05,Math.min(.35,+n.imageOpacity)):.14
+    imageOpacity:Number.isFinite(+n.imageOpacity)?Math.max(.05,Math.min(.70,+n.imageOpacity)):.14
   })) : [];
   state.edges = Array.isArray(data.edges) ? data.edges.map(e=>({
     ...e,
@@ -2127,10 +2127,10 @@ function renderProperties(){
       </div>
       <div id="nodeImageOpacityWrap" ${node.imageData?'':'hidden'}>
         <label class="form-label">画像の濃さ</label>
-        <input class="form-control" id="nodeImageOpacity" type="range" min="5" max="35" value="${Math.round((node.imageOpacity??.14)*100)}">
+        <input class="form-control" id="nodeImageOpacity" type="range" min="5" max="70" value="${Math.round((node.imageOpacity??.14)*100)}">
         <div class="range-caption"><span>薄い</span><span id="nodeImageOpacityValue">${Math.round((node.imageOpacity??.14)*100)}%</span><span>濃い</span></div>
       </div>
-      <div class="mini-text" style="margin-top:8px">画像は右下寄せの薄い背景として表示します。保存容量を抑えるため、選択時に最大512px相当へ縮小・圧縮されます。</div>
+      <div class="mini-text" style="margin-top:8px">画像は右下寄せの背景として表示します。透過PNG推奨です。濃さは5〜70%で調整でき、左上から右下へフェードします。保存容量を抑えるため、選択時に最大512px相当へ縮小・圧縮されます。</div>
     </div>
     <button class="btn" id="connectNodeBtn" style="width:100%;margin-bottom:8px">この機器から接続</button>
     <div class="action-grid single-actions">
