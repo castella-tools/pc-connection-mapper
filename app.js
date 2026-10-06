@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.39 loaded');
+console.info('PC Connection Mapper app.js v1.40 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -294,6 +294,7 @@ const world = document.getElementById('world');
 const nodesLayer = document.getElementById('nodes');
 const linksLayer = document.getElementById('links');
 const groupsLayer = document.getElementById('groups');
+const groupsBackLayer = document.getElementById('groupsBack');
 const guidesLayer = document.getElementById('guides');
 const diagramTitleLayer = document.getElementById('diagramTitleLayer');
 const palette = document.getElementById('palette');
@@ -525,7 +526,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.39',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',theme:'dark',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.40',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',theme:'dark',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -559,7 +560,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.39',
+    version:'1.40',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -574,7 +575,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.39',
+    version:'1.40',
     nextId:14,
     nextGroupId:5,
     nextAnnotationId:2,
@@ -583,10 +584,10 @@ function makeSample(){
       {id:1,text:'Internet → LAN → PC / Wi-Fi',size:'small',x:720,y:620}
     ],
     groups:[
-      {id:1,title:'Network',x:680,y:680,w:790,h:220,color:'#fb923c'},
-      {id:2,title:'Desk / Main PC',x:1530,y:650,w:1030,h:430,color:'#60a5fa'},
-      {id:3,title:'Wireless',x:800,y:980,w:600,h:250,color:'#a78bfa'},
-      {id:4,title:'Audio',x:1850,y:1130,w:620,h:220,color:'#34d399'}
+      {id:1,title:'Network',x:680,y:680,w:790,h:220,color:'#fb923c',layer:'normal'},
+      {id:2,title:'Desk / Main PC',x:1530,y:650,w:1030,h:430,color:'#60a5fa',layer:'normal'},
+      {id:3,title:'Wireless',x:800,y:980,w:600,h:250,color:'#a78bfa',layer:'normal'},
+      {id:4,title:'Audio',x:1850,y:1130,w:620,h:220,color:'#34d399',layer:'normal'}
     ],
     nodes:[
       {id:1,type:'ONU / Modem',iconKey:'modem',size:'medium',name:'ONU / Modem',model:'',note:'Internet',locked:false,x:730,y:740},
@@ -668,7 +669,8 @@ function applyImportedState(data, save=true){
     y:Number.isFinite(+g.y)?+g.y:800,
     w:Math.max(220,Number.isFinite(+g.w)?+g.w:560),
     h:Math.max(140,Number.isFinite(+g.h)?+g.h:340),
-    color:g.color || GROUP_ACCENTS[0]
+    color:g.color || GROUP_ACCENTS[0],
+    layer:g.layer==='back'?'back':'normal'
   })) : [];
   state.annotations = Array.isArray(data.annotations) ? data.annotations.map((a,i)=>({
     id:a.id ?? i+1,
@@ -939,7 +941,8 @@ function addGroup(){
     x:snap(Math.max(0,Math.min(WORKSPACE.width-560,c.x-280))),
     y:snap(Math.max(0,Math.min(WORKSPACE.height-340,c.y-170))),
     w:560,h:340,
-    color:GROUP_ACCENTS[(state.groups.length)%GROUP_ACCENTS.length]
+    color:GROUP_ACCENTS[(state.groups.length)%GROUP_ACCENTS.length],
+    layer:'normal'
   };
   state.groups.push(group);
   state.selectedGroupId=group.id;
@@ -949,14 +952,21 @@ function addGroup(){
   renderAll();scheduleSave();
 }
 
+function allGroupLayers(){
+  return [groupsBackLayer,groupsLayer].filter(Boolean);
+}
+
 function syncGroupSelectionStyles(){
-  groupsLayer.querySelectorAll('.group-frame').forEach(el=>{
-    el.classList.toggle('selected',Number(el.dataset.id)===state.selectedGroupId);
+  allGroupLayers().forEach(layer=>{
+    layer.querySelectorAll('.group-frame').forEach(el=>{
+      el.classList.toggle('selected',Number(el.dataset.id)===state.selectedGroupId);
+    });
   });
 }
 
 function renderGroups(){
   groupsLayer.innerHTML='';
+  if(groupsBackLayer)groupsBackLayer.innerHTML='';
   state.groups.forEach(group=>{
     const el=document.createElement('div');
     el.className='group-frame'+(state.selectedGroupId===group.id?' selected':'');
@@ -971,7 +981,8 @@ function renderGroups(){
       <div class="group-resize" title="サイズ変更"></div>
     `;
     bindGroupInteractions(el,group);
-    groupsLayer.appendChild(el);
+    const target=group.layer==='back'&&groupsBackLayer?groupsBackLayer:groupsLayer;
+    target.appendChild(el);
   });
 }
 
@@ -1072,7 +1083,7 @@ function bindGroupInteractions(el,group){
   handle.addEventListener('pointercancel',up);
 }
 function renderGroupVisual(group){
-  const el=groupsLayer.querySelector(`[data-id="${group.id}"]`);
+  const el=groupsLayer.querySelector(`[data-id="${group.id}"]`) || groupsBackLayer?.querySelector(`[data-id="${group.id}"]`);
   if(!el)return;
   el.style.left=`${group.x}px`;el.style.top=`${group.y}px`;
   el.style.width=`${group.w}px`;el.style.height=`${group.h}px`;
@@ -1935,7 +1946,11 @@ function renderProperties(){
         </div>
         <label class="form-label">アクセント色</label>
         <input class="form-control color-control" id="groupColor" type="color" value="${escapeHtml(group.color)}">
-        <div class="mini-text" style="margin-top:8px">見出し部分をクリックして編集、ドラッグして移動できます。枠の内側はカード操作を優先し、右下のハンドルでサイズ変更できます。</div>
+        <label class="form-label">表示順</label>
+        <select class="form-control" id="groupLayer">
+          ${optionList(['normal','back'],group.layer||'normal',{normal:'通常',back:'背面'})}
+        </select>
+        <div class="mini-text" style="margin-top:8px">通常は「カード ＞ グループ枠 ＞ ケーブル」の順で表示します。背面にすると「カード ＞ ケーブル ＞ グループ枠」になります。見出し部分をドラッグして移動し、右下のハンドルでサイズ変更できます。</div>
       </div>
       <button class="btn danger" id="deleteGroupBtn" style="width:100%">グループ枠を削除</button>
     `;
@@ -1956,6 +1971,13 @@ function renderProperties(){
     colorEl.addEventListener('input',()=>{group.color=colorEl.value;renderGroupVisual(group)});
     colorEl.addEventListener('change',()=>endTrackedEdit(colorEl));
     colorEl.addEventListener('blur',()=>endTrackedEdit(colorEl));
+    document.getElementById('groupLayer').addEventListener('change',e=>{
+      pushUndoSnapshot();
+      group.layer=e.target.value==='back'?'back':'normal';
+      renderGroups();
+      renderProperties();
+      scheduleSave();
+    });
     document.getElementById('deleteGroupBtn').onclick=deleteSelectedGroup;
     return;
   }
@@ -2895,8 +2917,9 @@ async function renderPng(options){
     ctx.restore();
   }
 
-  if(options.groups){
-    state.groups.forEach(group=>{
+  const drawPngGroups=(layer)=>{
+    if(!options.groups)return;
+    state.groups.filter(group=>(group.layer==='back'?'back':'normal')===layer).forEach(group=>{
       const x=group.x-bounds.x,y=group.y-bounds.y;
       ctx.save();
 
@@ -2945,7 +2968,9 @@ async function renderPng(options){
 
       ctx.restore();
     });
-  }
+  };
+
+  drawPngGroups('back');
 
   state.annotations.forEach(annotation=>{
     ctx.save();
@@ -2985,6 +3010,8 @@ async function renderPng(options){
       ctx.restore();
     }
   });
+
+  drawPngGroups('normal');
 
   state.nodes.forEach(node=>{
     const s=cardSize(node),x=node.x-bounds.x,y=node.y-bounds.y;
