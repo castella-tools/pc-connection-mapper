@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.40 loaded');
+console.info('PC Connection Mapper app.js v1.41 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -295,6 +295,7 @@ const nodesLayer = document.getElementById('nodes');
 const linksLayer = document.getElementById('links');
 const groupsLayer = document.getElementById('groups');
 const groupsBackLayer = document.getElementById('groupsBack');
+const groupControlsLayer = document.getElementById('groupControls');
 const guidesLayer = document.getElementById('guides');
 const diagramTitleLayer = document.getElementById('diagramTitleLayer');
 const palette = document.getElementById('palette');
@@ -526,7 +527,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.40',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',theme:'dark',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.41',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',theme:'dark',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -560,7 +561,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.40',
+    version:'1.41',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -575,7 +576,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.40',
+    version:'1.41',
     nextId:14,
     nextGroupId:5,
     nextAnnotationId:2,
@@ -953,42 +954,61 @@ function addGroup(){
 }
 
 function allGroupLayers(){
-  return [groupsBackLayer,groupsLayer].filter(Boolean);
+  return [groupsBackLayer,groupsLayer,groupControlsLayer].filter(Boolean);
 }
 
 function syncGroupSelectionStyles(){
   allGroupLayers().forEach(layer=>{
-    layer.querySelectorAll('.group-frame').forEach(el=>{
+    layer.querySelectorAll('.group-frame,.group-control-frame').forEach(el=>{
       el.classList.toggle('selected',Number(el.dataset.id)===state.selectedGroupId);
     });
   });
 }
 
+function syncGroupElementBox(el,group){
+  if(!el)return;
+  el.style.left=`${group.x}px`;
+  el.style.top=`${group.y}px`;
+  el.style.width=`${group.w}px`;
+  el.style.height=`${group.h}px`;
+  el.style.setProperty('--group-color',group.color);
+}
+
 function renderGroups(){
   groupsLayer.innerHTML='';
   if(groupsBackLayer)groupsBackLayer.innerHTML='';
+  if(groupControlsLayer)groupControlsLayer.innerHTML='';
+
   state.groups.forEach(group=>{
-    const el=document.createElement('div');
-    el.className='group-frame'+(state.selectedGroupId===group.id?' selected':'');
-    el.dataset.id=group.id;
-    el.style.left=`${group.x}px`;
-    el.style.top=`${group.y}px`;
-    el.style.width=`${group.w}px`;
-    el.style.height=`${group.h}px`;
-    el.style.setProperty('--group-color',group.color);
-    el.innerHTML=`
+    const visual=document.createElement('div');
+    visual.className='group-frame'+(state.selectedGroupId===group.id?' selected':'');
+    visual.dataset.id=group.id;
+    syncGroupElementBox(visual,group);
+
+    const target=group.layer==='back'&&groupsBackLayer?groupsBackLayer:groupsLayer;
+    target.appendChild(visual);
+
+    const controls=document.createElement('div');
+    controls.className='group-control-frame'+(state.selectedGroupId===group.id?' selected':'');
+    controls.dataset.id=group.id;
+    syncGroupElementBox(controls,group);
+    controls.innerHTML=`
+      <div class="group-hit-edge group-hit-top" title="グループを選択・移動"></div>
+      <div class="group-hit-edge group-hit-right" title="グループを選択・移動"></div>
+      <div class="group-hit-edge group-hit-bottom" title="グループを選択・移動"></div>
+      <div class="group-hit-edge group-hit-left" title="グループを選択・移動"></div>
       <div class="group-title-bar">${escapeHtml(group.title)}</div>
       <div class="group-resize" title="サイズ変更"></div>
     `;
-    bindGroupInteractions(el,group);
-    const target=group.layer==='back'&&groupsBackLayer?groupsBackLayer:groupsLayer;
-    target.appendChild(el);
+    bindGroupInteractions(controls,group,visual);
+    groupControlsLayer?.appendChild(controls);
   });
 }
 
-function bindGroupInteractions(el,group){
-  const title=el.querySelector('.group-title-bar');
-  const handle=el.querySelector('.group-resize');
+function bindGroupInteractions(controls,group,visual){
+  const title=controls.querySelector('.group-title-bar');
+  const handle=controls.querySelector('.group-resize');
+  const moveHandles=[title,...controls.querySelectorAll('.group-hit-edge')];
   let action=null;
 
   const selectGroup=()=>{
@@ -1000,7 +1020,7 @@ function bindGroupInteractions(el,group){
     renderProperties();
   };
 
-  title.addEventListener('pointerdown',e=>{
+  const startMove=(e,capturer)=>{
     if(e.button!==0)return;
     e.preventDefault();e.stopPropagation();
     selectGroup();
@@ -1010,9 +1030,18 @@ function bindGroupInteractions(el,group){
       sx:e.clientX,sy:e.clientY,
       x:group.x,y:group.y,
       before:contentSnapshot(),
-      moved:false
+      moved:false,
+      capturer
     };
-    title.setPointerCapture(e.pointerId);
+    try{capturer.setPointerCapture(e.pointerId)}catch{}
+  };
+
+  moveHandles.forEach(control=>{
+    control.addEventListener('pointerdown',e=>startMove(e,control));
+    control.addEventListener('click',e=>{
+      e.stopPropagation();
+      selectGroup();
+    });
   });
 
   handle.addEventListener('pointerdown',e=>{
@@ -1025,14 +1054,10 @@ function bindGroupInteractions(el,group){
       sx:e.clientX,sy:e.clientY,
       w:group.w,h:group.h,
       before:contentSnapshot(),
-      moved:false
+      moved:false,
+      capturer:handle
     };
-    handle.setPointerCapture(e.pointerId);
-  });
-
-  title.addEventListener('click',e=>{
-    e.stopPropagation();
-    selectGroup();
+    try{handle.setPointerCapture(e.pointerId)}catch{}
   });
 
   title.addEventListener('dblclick',e=>{
@@ -1050,14 +1075,12 @@ function bindGroupInteractions(el,group){
     if(action.kind==='move'){
       group.x=Math.max(0,Math.min(WORKSPACE.width-group.w,snap(action.x+dx)));
       group.y=Math.max(0,Math.min(WORKSPACE.height-group.h,snap(action.y+dy)));
-      el.style.left=`${group.x}px`;
-      el.style.top=`${group.y}px`;
     }else{
       group.w=Math.max(220,Math.min(WORKSPACE.width-group.x,snap(action.w+dx)));
       group.h=Math.max(140,Math.min(WORKSPACE.height-group.y,snap(action.h+dy)));
-      el.style.width=`${group.w}px`;
-      el.style.height=`${group.h}px`;
     }
+    syncGroupElementBox(controls,group);
+    syncGroupElementBox(visual,group);
   };
 
   const up=e=>{
@@ -1065,8 +1088,7 @@ function bindGroupInteractions(el,group){
     const current=action;
     action=null;
     try{
-      const capturer=current.kind==='resize'?handle:title;
-      if(capturer.hasPointerCapture(e.pointerId))capturer.releasePointerCapture(e.pointerId);
+      if(current.capturer?.hasPointerCapture(e.pointerId))current.capturer.releasePointerCapture(e.pointerId);
     }catch{}
     if(current.moved){
       pushUndoSnapshot(current.before);
@@ -1075,12 +1097,11 @@ function bindGroupInteractions(el,group){
     renderProperties();
   };
 
-  title.addEventListener('pointermove',move);
-  title.addEventListener('pointerup',up);
-  title.addEventListener('pointercancel',up);
-  handle.addEventListener('pointermove',move);
-  handle.addEventListener('pointerup',up);
-  handle.addEventListener('pointercancel',up);
+  [...moveHandles,handle].forEach(control=>{
+    control.addEventListener('pointermove',move);
+    control.addEventListener('pointerup',up);
+    control.addEventListener('pointercancel',up);
+  });
 }
 function renderGroupVisual(group){
   const el=groupsLayer.querySelector(`[data-id="${group.id}"]`) || groupsBackLayer?.querySelector(`[data-id="${group.id}"]`);
