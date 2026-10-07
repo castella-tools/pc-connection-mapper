@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.43 loaded');
+console.info('PC Connection Mapper app.js v1.44 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -298,6 +298,40 @@ const CABLE_GROUPS = [
   {label:'その他', items:['Other']}
 ];
 
+const DEFAULT_CABLE_BY_CATEGORY_PAIR = {
+  'PC・端末|ディスプレイ・映像':'DisplayPort',
+  'PC・端末|入力・操作':'USB-A',
+  'PC・端末|USB・拡張':'USB-C',
+  'PC・端末|オーディオ':'3.5mm',
+  'PC・端末|ネットワーク・ストレージ':'LAN',
+  'ディスプレイ・映像|ディスプレイ・映像':'HDMI',
+  'ディスプレイ・映像|オーディオ':'Optical',
+  '入力・操作|USB・拡張':'USB-A',
+  'USB・拡張|オーディオ':'USB-C',
+  'ネットワーク・ストレージ|ネットワーク・ストレージ':'LAN',
+  'ネットワーク・ストレージ|その他':'LAN',
+  'オーディオ|オーディオ':'3.5mm',
+  'その他|その他':'Other'
+};
+
+function categoryPairKey(a,b){
+  const order=new Map(DEVICE_GROUPS.map((group,index)=>[group.label,index]));
+  const ai=order.get(a)??999;
+  const bi=order.get(b)??999;
+  return ai<=bi?`${a}|${b}`:`${b}|${a}`;
+}
+
+function defaultCableTypeForNodes(fromNode,toNode){
+  const fromCategory=deviceCategoryInfo(fromNode?.type).label;
+  const toCategory=deviceCategoryInfo(toNode?.type).label;
+
+  // Power is intentionally broad at category level; fine tuning remains editable.
+  if(fromCategory==='電源'||toCategory==='電源')return 'AC Power';
+
+  const type=DEFAULT_CABLE_BY_CATEGORY_PAIR[categoryPairKey(fromCategory,toCategory)]||'USB-C';
+  return CABLES[type]?type:'USB-C';
+}
+
 const app = document.getElementById('app');
 const viewport = document.getElementById('viewport');
 const world = document.getElementById('world');
@@ -537,7 +571,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.43',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',theme:'dark',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.44',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',theme:'dark',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -571,7 +605,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.43',
+    version:'1.44',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -586,7 +620,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.43',
+    version:'1.44',
     nextId:14,
     nextGroupId:5,
     nextAnnotationId:2,
@@ -1547,12 +1581,15 @@ function handleConnectNode(nodeId){
     return;
   }
   pushUndoSnapshot();
+  const fromNode=state.nodes.find(n=>n.id===state.connectSourceId);
+  const toNode=state.nodes.find(n=>n.id===nodeId);
+  const defaultType=defaultCableTypeForNodes(fromNode,toNode);
   const edge = {
     id:`e${Date.now()}_${Math.random().toString(36).slice(2,6)}`,
     from:state.connectSourceId,
     to:nodeId,
-    type:'USB-C',
-    label:'USB-C',
+    type:defaultType,
+    label:defaultType,
     labelPos:.5,
     style:'curve',
     bend:.5,
@@ -2608,7 +2645,7 @@ function showHelpModal(isFirst=false){
     <p class="welcome-lead">PC・モニター・USB機器・オーディオ・ネットワーク機器などの接続関係を、カードとケーブルで視覚化できます。</p>
     <div class="welcome-grid">
       <div class="welcome-card"><strong>① 機器を追加</strong><p>左のデバイス一覧から追加し、カード全体をドラッグして配置します。</p></div>
-      <div class="welcome-card"><strong>② ケーブルを接続</strong><p>PCではカードのダブルクリック、スマートフォンでは下部の「接続」から開始できます。</p></div>
+      <div class="welcome-card"><strong>② ケーブルを接続</strong><p>PCではカードのダブルクリック、スマートフォンでは下部の「接続」から開始できます。接続種類は機器カテゴリの組み合わせから初期選択されます。</p></div>
       <div class="welcome-card"><strong>③ 整えて見やすく</strong><p>スマートガイド・複数選択・整列・グループ枠で、構成を見やすく整理できます。</p></div>
       <div class="welcome-card"><strong>④ タイトル・出力</strong><p>構成図タイトルを付け、JSONでバックアップしたりPNG画像として書き出せます。</p></div>
     </div>

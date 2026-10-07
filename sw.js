@@ -1,9 +1,9 @@
-const CACHE='pc-connection-mapper-v1.43';
+const CACHE='pc-connection-mapper-v1.44';
 const ASSETS=[
   './',
   './index.html',
-  './styles.css?v=1.43',
-  './app.js?v=1.43',
+  './styles.css?v=1.44',
+  './app.js?v=1.44',
   './manifest.webmanifest',
   './icon-192.png',
   './icon-512.png'
