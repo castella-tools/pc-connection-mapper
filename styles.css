@@ -891,3 +891,12 @@ textarea.form-control{resize:vertical;min-height:62px;line-height:1.4}
 }
 .node-image-preview.has-image{border-style:solid}
 .png-theme-note{margin:-2px 0 6px}
+
+
+/* Large card memo capacity */
+.node.size-large .node-note{
+  padding:0 10px 5px;
+  font-size:10px;
+  line-height:1.25;
+  -webkit-line-clamp:4;
+}

@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.41 loaded');
+console.info('PC Connection Mapper app.js v1.42 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -527,7 +527,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.41',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',theme:'dark',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.42',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',theme:'dark',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -561,7 +561,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.41',
+    version:'1.42',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -576,7 +576,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.41',
+    version:'1.42',
     nextId:14,
     nextGroupId:5,
     nextAnnotationId:2,
@@ -671,7 +671,7 @@ function applyImportedState(data, save=true){
     w:Math.max(220,Number.isFinite(+g.w)?+g.w:560),
     h:Math.max(140,Number.isFinite(+g.h)?+g.h:340),
     color:g.color || GROUP_ACCENTS[0],
-    layer:g.layer==='back'?'back':'normal'
+    layer:g.layer==='normal'?'normal':'back'
   })) : [];
   state.annotations = Array.isArray(data.annotations) ? data.annotations.map((a,i)=>({
     id:a.id ?? i+1,
@@ -943,7 +943,7 @@ function addGroup(){
     y:snap(Math.max(0,Math.min(WORKSPACE.height-340,c.y-170))),
     w:560,h:340,
     color:GROUP_ACCENTS[(state.groups.length)%GROUP_ACCENTS.length],
-    layer:'normal'
+    layer:'back'
   };
   state.groups.push(group);
   state.selectedGroupId=group.id;
@@ -1969,9 +1969,9 @@ function renderProperties(){
         <input class="form-control color-control" id="groupColor" type="color" value="${escapeHtml(group.color)}">
         <label class="form-label">表示順</label>
         <select class="form-control" id="groupLayer">
-          ${optionList(['normal','back'],group.layer||'normal',{normal:'通常',back:'背面'})}
+          ${optionList(['back','normal'],group.layer||'back',{back:'背面（標準）',normal:'ケーブルより前'})}
         </select>
-        <div class="mini-text" style="margin-top:8px">通常は「カード ＞ グループ枠 ＞ ケーブル」の順で表示します。背面にすると「カード ＞ ケーブル ＞ グループ枠」になります。見出し部分をドラッグして移動し、右下のハンドルでサイズ変更できます。</div>
+        <div class="mini-text" style="margin-top:8px">標準は「カード ＞ ケーブル ＞ グループ枠」の順です。必要な場合だけ「ケーブルより前」に切り替えられます。見出し・枠線をドラッグして移動し、右下のハンドルでサイズ変更できます。</div>
       </div>
       <button class="btn danger" id="deleteGroupBtn" style="width:100%">グループ枠を削除</button>
     `;
@@ -3116,9 +3116,9 @@ async function renderPng(options){
     }
 
     ctx.fillStyle=light?'#556274':'#aab4c5';
-    ctx.font=`${node.size==='xlarge'?11:9}px ${uiFont}`;
-    const noteLimit=node.size==='xlarge'?6:2;
-    const lineHeight=node.size==='xlarge'?16:12;
+    ctx.font=`${node.size==='xlarge'?11:(node.size==='large'?10:9)}px ${uiFont}`;
+    const noteLimit=node.size==='xlarge'?6:(node.size==='large'?4:2);
+    const lineHeight=node.size==='xlarge'?16:(node.size==='large'?12.5:12);
     const availableHeight=Math.max(0,y+s.h-10-noteY);
     const heightLines=Math.max(0,Math.floor(availableHeight/lineHeight)+1);
     const effectiveLimit=Math.min(noteLimit,heightLines);
