@@ -1,4 +1,4 @@
-console.info('PC Connection Mapper app.js v1.42 loaded');
+console.info('PC Connection Mapper app.js v1.43 loaded');
 
 const WORKSPACE = { width: 3200, height: 2200 };
 const GRID = 20;
@@ -18,10 +18,12 @@ const DEVICE_SEARCH_ALIASES = {
   'Projector':'プロジェクター projector',
   'KVM Switch':'KVM 切替器 切替 switch',
   'Capture Card':'キャプチャーボード キャプチャカード capture',
+  'Video Splitter / Matrix':'映像分配 分配器 HDMI分配 マトリクス splitter matrix',
   'Keyboard':'キーボード',
   'Mouse':'マウス',
   'Trackball':'トラックボール',
   'Controller':'コントローラー ゲームパッド gamepad',
+  'Keypad / Macro Pad':'左手デバイス 左手キーボード テンキー マクロパッド Stream Deck keypad macro',
   'Drawing Tablet':'ペンタブ ペンタブレット 液タブ drawing tablet',
   'Webcam':'ウェブカメラ web camera',
   'USB Hub':'USBハブ ハブ',
@@ -49,6 +51,7 @@ const DEVICE_SEARCH_ALIASES = {
   'USB Charger':'USB充電器 充電器 charger GaN',
   'Printer':'プリンター',
   'Smart Home / IoT':'スマートホーム IoT 家電 センサー hub smart home',
+  'Telephone / IP Phone':'電話 電話機 IP電話 ビジネスホン phone telephone',
   'Other':'その他',
   'Text':'テキスト 文字 注釈 annotation label'
 };
@@ -70,7 +73,8 @@ const DEVICE_GROUPS = [
       ['Monitor','monitor','medium'],
       ['Projector','projector','medium'],
       ['KVM Switch','kvm-switch','medium'],
-      ['Capture Card','capture-card','medium']
+      ['Capture Card','capture-card','medium'],
+      ['Video Splitter / Matrix','video-splitter','medium']
     ]
   },
   {
@@ -80,6 +84,7 @@ const DEVICE_GROUPS = [
       ['Mouse','mouse','small'],
       ['Trackball','trackball','small'],
       ['Controller','controller','small'],
+      ['Keypad / Macro Pad','keypad-macro','small'],
       ['Drawing Tablet','drawing-tablet','medium'],
       ['Webcam','webcam','small']
     ]
@@ -132,6 +137,7 @@ const DEVICE_GROUPS = [
     items:[
       ['Printer','printer','medium'],
       ['Smart Home / IoT','smart-home','medium'],
+      ['Telephone / IP Phone','telephone','small'],
       ['Other','other','small'],
       ['Text','text','small']
     ]
@@ -191,6 +197,7 @@ const ICON_SVGS = {
   mouse:'<rect x="7" y="2.5" width="10" height="19" rx="5"/><path d="M12 2.5v6"/>',
   trackball:'<rect x="5" y="3" width="14" height="18" rx="6"/><circle cx="12" cy="9" r="3"/>',
   controller:'<path d="M8 8h8c3 0 5 2 5 5 0 4-2 7-4 7-1.5 0-2.3-2-3.5-2h-3C9.3 18 8.5 20 7 20c-2 0-4-3-4-7 0-3 2-5 5-5z"/><path d="M7 12h4M9 10v4M16 11h.01M18 13h.01"/>',
+  'keypad-macro':'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M7 8h2v2H7zM11 8h2v2h-2zM15 8h2v2h-2zM7 12h2v2H7zM11 12h2v2h-2zM15 12h2v2h-2zM7 16h6"/>',
   'drawing-tablet':'<rect x="3" y="4" width="15" height="16" rx="2"/><path d="M7 8h7v8H7zM20 4l1 1-7 7-2 1 1-2z"/>',
   webcam:'<rect x="4" y="6" width="16" height="11" rx="3"/><circle cx="12" cy="11.5" r="3"/><path d="M9 21h6M12 17v4"/>',
   'usb-hub':'<rect x="4" y="7" width="16" height="10" rx="2"/><path d="M8 7V4M12 7V3M16 7V4M8 17v3M12 17v4M16 17v3"/><circle cx="8" cy="4" r="1"/><circle cx="12" cy="3" r="1"/><circle cx="16" cy="4" r="1"/>',
@@ -217,11 +224,13 @@ const ICON_SVGS = {
   'game-console':'<path d="M8 8h8c3 0 5 2 5 5 0 4-2 7-4 7-1.5 0-2.3-2-3.5-2h-3C9.3 18 8.5 20 7 20c-2 0-4-3-4-7 0-3 2-5 5-5z"/><path d="M7 12h4M9 10v4M16 11h.01M18 13h.01"/>',
   'kvm-switch':'<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h4M7 14h4M15 9v6M18 10v4"/><path d="M12 3v3M12 18v3"/>',
   'capture-card':'<rect x="4" y="5" width="16" height="14" rx="3"/><path d="M8 9h8v6H8z"/><path d="M2 12h2M20 12h2"/>',
+  'video-splitter':'<rect x="4" y="6" width="16" height="12" rx="2"/><path d="M2 12h3M19 9h3M19 15h3M8 9h4v6H8zM12 12h7"/>',
   modem:'<rect x="4" y="6" width="16" height="12" rx="3"/><path d="M8 10h.01M11 10h.01M14 10h.01M8 14h8"/><path d="M12 3v3"/>',
   'access-point':'<rect x="6" y="9" width="12" height="9" rx="2"/><path d="M12 18v3"/><path d="M8 7c1.1-1.1 2.4-1.6 4-1.6S14.9 5.9 16 7M5 4c1.9-1.8 4.2-2.7 7-2.7S17.1 2.2 19 4"/>',
   'power-strip':'<rect x="3" y="7" width="18" height="10" rx="3"/><circle cx="8" cy="12" r="1.6"/><circle cx="13" cy="12" r="1.6"/><path d="M18 10v4M21 12h2"/>',
   'usb-charger':'<rect x="7" y="5" width="10" height="14" rx="2"/><path d="M10 5V2M14 5V2M10 12h4M12 10v4M17 15h3"/>',
   'smart-home':'<path d="M3 11 12 4l9 7"/><path d="M6 10v10h12V10M10 20v-5h4v5"/><path d="M9 11c.8-.8 1.8-1.2 3-1.2s2.2.4 3 1.2M11 13c.3-.3.6-.4 1-.4s.7.1 1 .4"/>',
+  telephone:'<path d="M6 4h12v5H6z"/><path d="M5 10h14l2 10H3z"/><path d="M8 14h2M12 14h2M16 14h1M8 17h2M12 17h2M16 17h1"/>',
   text:'<path d="M5 6V4h14v2M12 4v16M8 20h8"/>',
   other:'<rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 9h6v6H9z"/>'
 };
@@ -268,6 +277,7 @@ const CABLES = {
 
   'LAN':{color:'#fb923c'},
   'PoE':{color:'#fb923c'},
+  'Telephone Line':{color:'#fb923c'},
 
   'AC Power':{color:'#94a3b8'},
   'DC Power':{color:'#94a3b8'},
@@ -282,7 +292,7 @@ const CABLE_GROUPS = [
   {label:'USB / 高速I/O', items:['USB-A','USB-B','USB-C','Micro-USB','USB4','Thunderbolt']},
   {label:'映像', items:['HDMI','DisplayPort','DVI','VGA']},
   {label:'音声', items:['3.5mm','6.3mm','RCA','XLR','Optical','Speaker Cable']},
-  {label:'ネットワーク', items:['LAN','PoE']},
+  {label:'ネットワーク・通信', items:['LAN','PoE','Telephone Line']},
   {label:'電源', items:['AC Power','DC Power']},
   {label:'無線', items:['Bluetooth','Wi-Fi']},
   {label:'その他', items:['Other']}
@@ -527,7 +537,7 @@ function bindTrackedText(el,onInput){
 }
 
 function makeBlank(){
-  return {version:'1.42',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',theme:'dark',x:1450,y:900},view:{x:0,y:0,scale:1}};
+  return {version:'1.43',nextId:1,nextGroupId:1,nextAnnotationId:1,nodes:[],edges:[],groups:[],annotations:[],diagram:{title:'',size:'medium',theme:'dark',x:1450,y:900},view:{x:0,y:0,scale:1}};
 }
 
 function escapeHtml(value){
@@ -561,7 +571,7 @@ function scheduleSave(){
 
 function serializableState(){
   return {
-    version:'1.42',
+    version:'1.43',
     nodes:state.nodes,
     edges:state.edges,
     groups:state.groups,
@@ -576,7 +586,7 @@ function serializableState(){
 
 function makeSample(){
   return {
-    version:'1.42',
+    version:'1.43',
     nextId:14,
     nextGroupId:5,
     nextAnnotationId:2,
